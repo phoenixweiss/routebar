@@ -1,0 +1,22 @@
+.DS_Store
+*.log
+
+.env
+.env.*
+!.env.example
+
+# Generated and temporary files.
+/build/
+/dist/
+/coverage/
+/work/
+/tmp/
+
+# Local working files.
+/AGENTS.md
+/todo.tmp.md
+/*.tmp.md
+
+# Personal runtime configurations.
+/routebar.yaml
+/routebar.yml
