@@ -8,6 +8,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- Clarified the pre-release compatibility promise for the versioned YAML schema.
+
 ## [0.1.0] - 2026-09-25
 
 ### Added

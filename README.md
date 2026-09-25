@@ -41,7 +41,8 @@ as [Yonder](https://github.com/phoenixweiss/yonder) can keep the source in that
 storage and expose it at the expected local path.
 
 See [the example configuration](examples/routebar.yaml) for the current shape.
-The schema remains pre-release and may change before version 0.1.0.
+The schema remains pre-release throughout the 0.x series and may change between
+minor versions.
 
 Schema version 1 is IPv4-only: every current A record is refreshed and
 deduplicated for each plan, fixed addresses must be IPv4, and AAAA records are
