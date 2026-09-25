@@ -8,6 +8,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-25
+
 ### Added
 
 - A strict versioned YAML configuration for profiles, route groups, HTTPS checks,
@@ -31,3 +33,6 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   the public repository contains only fictional network data.
 - Privileged route state is restricted to a fixed root-owned path instead of a
   caller-selected location.
+
+[Unreleased]: https://github.com/phoenixweiss/routebar/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/phoenixweiss/routebar/releases/tag/v0.1.0
