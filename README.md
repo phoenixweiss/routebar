@@ -9,8 +9,9 @@ of destinations that should use the current physical network gateway instead of
 the active VPN route.
 
 The project combines a human-readable YAML configuration, an automatic
-root-owned reconciliation process, and an optional SwiftBar status view. RouteBar
-is not a VPN client and does not replace or reconfigure the system default route.
+root-owned reconciliation process, and a native status app available from both
+the menu bar and a regular window. RouteBar is not a VPN client and does not
+replace or reconfigure the system default route.
 
 ## Roadmap
 
@@ -22,10 +23,9 @@ The current development build already:
 - install only explicit host routes and track only routes created by RouteBar;
 - reconcile routes every 30 seconds after gateway, DNS, wake, or VPN changes;
 - keep mail transport definitions separate from route-bypass rules;
-- show a read-only network and route preview in SwiftBar.
+- show current network, route, and automation state in a native menu and window.
 
-Focused TCP, TLS, STARTTLS, and HTTP health checks and a finished menu bar UI
-remain on the roadmap.
+Focused TCP, TLS, STARTTLS, and HTTP health checks remain on the roadmap.
 
 ## Configuration
 
@@ -54,11 +54,12 @@ default route for convenience. Before applying a change, it should rediscover th
 current physical gateway, resolve DNS again, and compare the desired routes with
 the routes it previously created.
 
-The SwiftBar plugin runs without elevated privileges. A separate root-owned
-executable exposes only narrow operations for planning, applying, adopting,
-removing, and inspecting RouteBar-owned host routes. It accepts a configuration
-path and a profile identifier, not arbitrary shell commands. Privileged state
-always uses the fixed root-owned path `/var/db/routebar/state.json`.
+The native app runs without elevated privileges and does not change routes. A
+separate root-owned executable exposes only narrow operations for planning,
+applying, adopting, removing, and inspecting RouteBar-owned host routes. It
+accepts a configuration path and a profile identifier, not arbitrary shell
+commands. Privileged state always uses the fixed root-owned path
+`/var/db/routebar/state.json`.
 
 ## Current development build
 
@@ -71,7 +72,8 @@ The current build provides:
 - safe one-time adoption of matching routes created manually before installation;
 - a root-owned launch daemon that reconciles every 30 seconds;
 - cleanup that removes only routes still matching RouteBar's state;
-- a compact SwiftBar menu for the preview and configuration errors;
+- a native menu bar summary and a full status window for the network, route groups,
+  and daemon;
 - separate display of mail and other connectivity-only checks.
 
 HTTPS and mail endpoint checks are represented in the configuration but are not
@@ -88,8 +90,7 @@ maintained alongside it. User-visible changes are recorded in the
 Requirements for the development build:
 
 - macOS 13 or newer;
-- a Swift 6 toolchain;
-- SwiftBar for the menu bar UI.
+- a Swift 6 toolchain.
 
 Run the checks and inspect the example plan:
 
@@ -102,15 +103,26 @@ The `--profile` override selects a known configuration profile explicitly. Witho
 it, automatic profile selection uses an exact SSID match and fails closed if the
 SSID is unavailable or ambiguous.
 
-Install reversible development symlinks for the binary and SwiftBar plugin:
+Build, install, and open the native app for the current user:
 
 ```bash
-script/install-dev
+script/install-app
 ```
 
-The menu will report a missing configuration until
-`~/.config/routebar/config.yaml` exists. Remove only RouteBar-owned development
-links with `script/uninstall-dev`.
+The app is installed at `~/Applications/RouteBar.app` and starts automatically
+at login in the menu bar. Choose **Open Window** in the menu or launch RouteBar
+from Spotlight or Finder to open the full status window. **Show in Dock** keeps a
+Dock icon available when the menu bar is crowded. The app reads the configuration
+path and selected profile from the installed system daemon, falling back to
+`~/.config/routebar/config.yaml` when the daemon is not installed.
+
+Remove only the app and its user LaunchAgent with:
+
+```bash
+script/uninstall-app
+```
+
+This does not stop the system daemon or remove any routes.
 
 ## Automatic reconciliation
 

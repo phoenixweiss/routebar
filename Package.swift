@@ -10,6 +10,7 @@ let package = Package(
   products: [
     .library(name: "RouteBarCore", targets: ["RouteBarCore"]),
     .executable(name: "routebar", targets: ["RouteBarCLI"]),
+    .executable(name: "routebar-app", targets: ["RouteBarApp"]),
   ],
   dependencies: [
     .package(url: "https://github.com/jpsim/Yams.git", from: "6.2.2")
@@ -27,6 +28,14 @@ let package = Package(
     .executableTarget(
       name: "RouteBarCLI",
       dependencies: ["RouteBarCore"]
+    ),
+    .executableTarget(
+      name: "RouteBarApp",
+      dependencies: ["RouteBarCore"],
+      linkerSettings: [
+        .linkedFramework("AppKit"),
+        .linkedFramework("SwiftUI"),
+      ]
     ),
     .testTarget(
       name: "RouteBarCoreTests",

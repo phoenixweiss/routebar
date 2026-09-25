@@ -37,7 +37,6 @@ private let help = """
   Usage:
     routebar validate [--config PATH]
     routebar plan [--config PATH] [--profile ID]
-    routebar swiftbar [--config PATH] [--profile ID]
     routebar reconcile [--config PATH] [--profile ID]
                        [--apply | --adopt-existing] [--quiet]
     routebar cleanup [--apply] [--quiet]
@@ -167,20 +166,6 @@ do {
       let description = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
       fputs("Planning error: \(description)\n", stderr)
       exit(ExitCode.planningFailure)
-    }
-
-  case "swiftbar":
-    let options = try parseOptions(arguments.dropFirst(), allowProfile: true)
-    do {
-      let configuration = try ConfigurationLoader.load(from: options.configURL)
-      let plan = try RoutePlanner().plan(
-        configuration: configuration,
-        forcedProfileID: options.profileID
-      )
-      print(SwiftBarFormatter.success(plan, configURL: options.configURL))
-    } catch {
-      let description = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-      print(SwiftBarFormatter.failure(description, configURL: options.configURL))
     }
 
   case "reconcile":

@@ -1,0 +1,110 @@
+#!/bin/sh
+
+set -eu
+
+project_dir=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd -P)
+bundle_id=io.github.phoenixweiss.routebar.menu
+legacy_bundle_id=io.github.phoenixweiss.routebar.app
+legacy_label=$legacy_bundle_id
+label=$bundle_id
+app_path="$HOME/Applications/RouteBar.app"
+executable_path="$app_path/Contents/MacOS/routebar-app"
+agent_path="$HOME/Library/LaunchAgents/$label.plist"
+legacy_agent_path="$HOME/Library/LaunchAgents/$legacy_label.plist"
+uid=$(id -u)
+version=$(tr -d '\n' < "$project_dir/VERSION")
+lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+
+swift build --package-path "$project_dir" -c release --product routebar-app
+
+temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/routebar-app-install.XXXXXX")
+temporary_app="$temporary_dir/RouteBar.app"
+temporary_agent="$temporary_dir/$label.plist"
+cleanup_temporary_files() {
+  rm -rf "$temporary_dir" 2>/dev/null || true
+}
+trap cleanup_temporary_files EXIT
+trap 'exit 1' HUP INT TERM
+
+mkdir -p "$temporary_app/Contents/MacOS"
+cp "$project_dir/Support/RouteBarApp-Info.plist" "$temporary_app/Contents/Info.plist"
+plutil -replace CFBundleShortVersionString -string "$version" "$temporary_app/Contents/Info.plist"
+plutil -replace CFBundleVersion -string "$version" "$temporary_app/Contents/Info.plist"
+install -m 0755 "$project_dir/.build/release/routebar-app" \
+  "$temporary_app/Contents/MacOS/routebar-app"
+plutil -lint "$temporary_app/Contents/Info.plist" >/dev/null
+codesign --force --deep --sign - "$temporary_app" >/dev/null
+
+cp "$project_dir/Support/io.github.phoenixweiss.routebar.menu.plist" "$temporary_agent"
+plutil -remove ProgramArguments.2 "$temporary_agent"
+plutil -insert ProgramArguments.2 -string "$app_path" "$temporary_agent"
+plutil -lint "$temporary_agent" >/dev/null
+configured_launcher=$(plutil -extract ProgramArguments.0 raw -o - "$temporary_agent")
+configured_app=$(plutil -extract ProgramArguments.2 raw -o - "$temporary_agent")
+configured_mode=$(plutil -extract ProgramArguments.4 raw -o - "$temporary_agent")
+if [ "$configured_launcher" != "/usr/bin/open" ] \
+  || [ "$configured_app" != "$app_path" ] \
+  || [ "$configured_mode" != "--background" ]; then
+  echo "Generated launch agent does not contain the expected arguments." >&2
+  exit 1
+fi
+if plutil -extract ProgramArguments.5 raw -o - "$temporary_agent" >/dev/null 2>&1; then
+  echo "Generated launch agent contains unexpected extra arguments." >&2
+  exit 1
+fi
+
+if [ -e "$agent_path" ]; then
+  installed_label=$(plutil -extract Label raw -o - "$agent_path" 2>/dev/null || true)
+  if [ "$installed_label" != "$label" ]; then
+    echo "Refusing to replace an unexpected launch agent: $agent_path" >&2
+    exit 1
+  fi
+fi
+
+if [ -e "$legacy_agent_path" ]; then
+  installed_label=$(plutil -extract Label raw -o - "$legacy_agent_path" 2>/dev/null || true)
+  if [ "$installed_label" != "$legacy_label" ]; then
+    echo "Refusing to replace an unexpected launch agent: $legacy_agent_path" >&2
+    exit 1
+  fi
+fi
+
+if [ -e "$app_path" ]; then
+  installed_bundle_id=$(plutil -extract CFBundleIdentifier raw -o - \
+    "$app_path/Contents/Info.plist" 2>/dev/null || true)
+  if [ "$installed_bundle_id" != "$bundle_id" ] \
+    && [ "$installed_bundle_id" != "$legacy_bundle_id" ]; then
+    echo "Refusing to replace an unexpected application: $app_path" >&2
+    exit 1
+  fi
+fi
+
+if launchctl print "gui/$uid/$legacy_label" >/dev/null 2>&1; then
+  launchctl bootout "gui/$uid/$legacy_label"
+fi
+if launchctl print "gui/$uid/$label" >/dev/null 2>&1; then
+  launchctl bootout "gui/$uid/$label"
+fi
+for process_command in "$executable_path" "$executable_path --background"; do
+  process_ids=$(pgrep -f -x "$process_command" 2>/dev/null || true)
+  if [ -n "$process_ids" ]; then
+    kill $process_ids
+  fi
+done
+if [ -e "$legacy_agent_path" ]; then
+  unlink "$legacy_agent_path"
+fi
+
+mkdir -p "$HOME/Applications"
+if [ -e "$app_path" ]; then
+  rm -rf "$app_path"
+fi
+mv "$temporary_app" "$app_path"
+"$lsregister" -f "$app_path"
+mkdir -p "$HOME/Library/LaunchAgents"
+install -m 0644 "$temporary_agent" "$agent_path"
+launchctl bootstrap "gui/$uid" "$agent_path"
+open "$app_path"
+
+echo "RouteBar menu and status window are installed and open."
+echo "Application: $app_path"

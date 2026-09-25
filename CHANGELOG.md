@@ -13,13 +13,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - A strict versioned YAML configuration for profiles, route groups, HTTPS checks,
   and separate connectivity-only endpoints.
 - Fresh physical gateway, VPN interface, and IPv4 DNS discovery for every plan.
-- Read-only route planning in the CLI and an optional SwiftBar preview.
+- Read-only route planning in the CLI and a native macOS status app with a menu
+  bar summary, full window, and optional Dock presence.
 - Fail-closed reconciliation of explicit `/32` routes with root-owned state.
 - One-time adoption of matching routes that existed before RouteBar installation.
 - A system launch daemon that reconciles routes every 30 seconds.
-- Reversible development links and guarded system installation and removal scripts.
+- Guarded installation and removal scripts for the native menu and system daemon.
 - Unit coverage for configuration, network discovery, route inspection, planning,
-  reconciliation, cleanup, and SwiftBar output.
+  reconciliation, cleanup, daemon status, and live route status.
 
 ### Security
 
