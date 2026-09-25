@@ -10,7 +10,7 @@ struct RouteBarApp: App {
     MenuBarExtra {
       RouteBarMenuView(model: model)
     } label: {
-      Label("RouteBar", systemImage: model.menuBarSymbol)
+      RouteBarMenuBarSymbol()
         .task {
           await model.startPolling()
         }

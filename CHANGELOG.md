@@ -8,6 +8,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- The macOS app and menu bar now use the approved RouteBar identity instead of
+  generic system symbols.
+
 ## [0.1.1] - 2026-09-25
 
 ### Fixed

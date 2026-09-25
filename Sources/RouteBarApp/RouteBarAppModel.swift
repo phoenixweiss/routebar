@@ -42,17 +42,6 @@ final class RouteBarAppModel: ObservableObject {
     }
   }
 
-  var menuBarSymbol: String {
-    switch state {
-    case .loading:
-      "arrow.triangle.2.circlepath"
-    case .ready(let snapshot, _):
-      Self.isHealthy(snapshot) ? "checkmark.shield.fill" : "exclamationmark.triangle.fill"
-    case .failed:
-      "xmark.octagon.fill"
-    }
-  }
-
   func startPolling() async {
     guard !pollingStarted else { return }
     pollingStarted = true
@@ -135,12 +124,6 @@ final class RouteBarAppModel: ObservableObject {
     }
   }
 
-  private static func isHealthy(_ snapshot: RouteStatusSnapshot) -> Bool {
-    snapshot.allRoutesActive
-      && snapshot.daemon.installed
-      && snapshot.daemon.loaded
-      && snapshot.daemon.lastExitCode == 0
-  }
 }
 
 private struct FixedDaemonRuntimeInspector: DaemonRuntimeInspecting {

@@ -1,0 +1,53 @@
+#!/bin/sh
+
+set -eu
+
+project_dir=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd -P)
+source_svg="$project_dir/Support/RouteBarAppIcon.svg"
+small_source_svg="$project_dir/Support/RouteBarAppIconSmall.svg"
+output_icns="$project_dir/Support/RouteBar.icns"
+
+if ! command -v rsvg-convert >/dev/null 2>&1; then
+  echo "rsvg-convert is required to build the app icon." >&2
+  exit 1
+fi
+if ! command -v iconutil >/dev/null 2>&1; then
+  echo "iconutil is required to build the app icon." >&2
+  exit 1
+fi
+
+temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/routebar-icon.XXXXXX")
+iconset="$temporary_dir/RouteBar.iconset"
+cleanup_temporary_files() {
+  rm -rf "$temporary_dir" 2>/dev/null || true
+}
+trap cleanup_temporary_files EXIT
+trap 'exit 1' HUP INT TERM
+
+mkdir -p "$iconset"
+
+render_icon() {
+  size=$1
+  filename=$2
+  rsvg-convert -w "$size" -h "$size" -o "$iconset/$filename" "$source_svg"
+}
+
+render_small_icon() {
+  size=$1
+  filename=$2
+  rsvg-convert -w "$size" -h "$size" -o "$iconset/$filename" "$small_source_svg"
+}
+
+render_small_icon 16 icon_16x16.png
+render_small_icon 32 icon_16x16@2x.png
+render_small_icon 32 icon_32x32.png
+render_icon 64 icon_32x32@2x.png
+render_icon 128 icon_128x128.png
+render_icon 256 icon_128x128@2x.png
+render_icon 256 icon_256x256.png
+render_icon 512 icon_256x256@2x.png
+render_icon 512 icon_512x512.png
+render_icon 1024 icon_512x512@2x.png
+
+iconutil --convert icns --output "$output_icns" "$iconset"
+echo "Built $output_icns"

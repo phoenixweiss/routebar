@@ -12,6 +12,8 @@
   <string>io.github.phoenixweiss.routebar.menu</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
+  <key>CFBundleIconFile</key>
+  <string>RouteBar.icns</string>
   <key>CFBundleName</key>
   <string>RouteBar</string>
   <key>CFBundlePackageType</key>
