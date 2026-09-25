@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+project_root="$(git rev-parse --show-toplevel)"
+cd "$project_root"
+
+: "${BUMPSTER_PREV_VERSION:?Bumpster did not provide the previous version.}"
+: "${BUMPSTER_NEW_VERSION:?Bumpster did not provide the new version.}"
+
+script/check
+script/prepare-release-changelog
+git diff --check
+git add CHANGELOG.md

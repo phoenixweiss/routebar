@@ -1,0 +1,18 @@
+#!/bin/sh
+
+set -eu
+
+cd "$(dirname "$0")/.."
+
+swift build
+swift format lint --strict --recursive Sources Tests
+swift test
+swift run routebar validate --config examples/routebar.yaml
+sh -n script/install-daemon
+sh -n script/uninstall-daemon
+sh -n script/prepare-release-changelog
+bash -n .bumpster/hooks/pre-bump
+plutil -lint Support/io.github.phoenixweiss.routebar.plist >/dev/null
+grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' VERSION
+grep -Fqx '## [Unreleased]' CHANGELOG.md
+git diff --check

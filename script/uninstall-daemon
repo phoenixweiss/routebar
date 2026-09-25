@@ -1,0 +1,39 @@
+#!/bin/sh
+
+set -eu
+
+label=io.github.phoenixweiss.routebar
+binary_path=/Library/PrivilegedHelperTools/io.github.phoenixweiss.routebar
+plist_path=/Library/LaunchDaemons/io.github.phoenixweiss.routebar.plist
+state_path=/var/db/routebar/state.json
+
+if [ -e "$plist_path" ]; then
+  installed_label=$(plutil -extract Label raw -o - "$plist_path" 2>/dev/null || true)
+  if [ "$installed_label" != "$label" ]; then
+    echo "Refusing to remove an unexpected launch daemon: $plist_path" >&2
+    exit 1
+  fi
+fi
+
+if sudo launchctl print "system/$label" >/dev/null 2>&1; then
+  sudo launchctl bootout "system/$label"
+fi
+
+if [ -x "$binary_path" ]; then
+  sudo "$binary_path" cleanup --apply --quiet
+fi
+
+if [ -e "$plist_path" ]; then
+  sudo unlink "$plist_path"
+fi
+if [ -e "$binary_path" ]; then
+  sudo unlink "$binary_path"
+fi
+if [ -e "$state_path" ]; then
+  sudo unlink "$state_path"
+fi
+if [ -d /var/db/routebar ]; then
+  sudo rmdir /var/db/routebar
+fi
+
+echo "RouteBar automatic reconciliation was removed."

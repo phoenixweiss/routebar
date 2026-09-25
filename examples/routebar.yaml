@@ -18,23 +18,23 @@ groups:
     name: Work services
     mode: bypass-vpn
     domains:
-      - portal.example.com
-      - account.example.com
+      - example.com
+      - example.net
     addresses: []
     checks:
       - type: https
-        url: https://portal.example.com/
+        url: https://example.com/
         expected_statuses: [200, 302]
 
   - id: library
     name: Library
     mode: bypass-vpn
     domains:
-      - library.example.org
+      - example.org
     addresses: []
     checks:
       - type: https
-        url: https://library.example.org/
+        url: https://example.org/
         expected_statuses: [200]
 
   - id: mail

@@ -1,0 +1,99 @@
+#!/bin/sh
+
+set -eu
+
+: "${BUMPSTER_PREV_VERSION:?Bumpster did not provide the previous version.}"
+: "${BUMPSTER_NEW_VERSION:?Bumpster did not provide the new version.}"
+
+changelog_file=${CHANGELOG_FILE:-CHANGELOG.md}
+version_file=${VERSION_FILE:-VERSION}
+repository_url=https://github.com/phoenixweiss/routebar
+
+if [ ! -f "$changelog_file" ] || [ ! -f "$version_file" ]; then
+  echo "CHANGELOG.md and VERSION must exist before preparing a release." >&2
+  exit 1
+fi
+
+current_version=$(tr -d '\n' < "$version_file")
+if [ "$current_version" != "$BUMPSTER_PREV_VERSION" ]; then
+  echo "VERSION does not match BUMPSTER_PREV_VERSION." >&2
+  exit 1
+fi
+
+if grep -Fq "## [$BUMPSTER_NEW_VERSION]" "$changelog_file"; then
+  echo "CHANGELOG.md already contains version $BUMPSTER_NEW_VERSION." >&2
+  exit 1
+fi
+
+unreleased_lines=$(awk '
+  $0 == "## [Unreleased]" { active = 1; next }
+  active && /^## / { active = 0 }
+  active && $0 !~ /^[[:space:]]*$/ { count += 1 }
+  END { print count + 0 }
+' "$changelog_file")
+if [ "$unreleased_lines" -eq 0 ]; then
+  echo "CHANGELOG.md has no Unreleased entries." >&2
+  exit 1
+fi
+
+release_date=$(date +%Y-%m-%d)
+temporary_file=$(mktemp "${TMPDIR:-/tmp}/routebar-changelog.XXXXXX")
+links_file="$temporary_file.links"
+cleanup_temporary_file() {
+  rm -f "$temporary_file" 2>/dev/null || true
+  rm -f "$links_file" 2>/dev/null || true
+}
+trap cleanup_temporary_file EXIT
+trap 'exit 1' HUP INT TERM
+
+awk -v version="$BUMPSTER_NEW_VERSION" -v release_date="$release_date" '
+  $0 == "## [Unreleased]" && !updated {
+    print
+    print ""
+    print "## [" version "] - " release_date
+    updated = 1
+    next
+  }
+  { print }
+  END {
+    if (!updated) {
+      exit 2
+    }
+  }
+' "$changelog_file" > "$temporary_file"
+
+if grep -Fq '[Unreleased]:' "$temporary_file"; then
+  awk \
+    -v repository_url="$repository_url" \
+    -v previous="$BUMPSTER_PREV_VERSION" \
+    -v version="$BUMPSTER_NEW_VERSION" '
+    /^\[Unreleased\]:/ && !updated {
+      print "[Unreleased]: " repository_url "/compare/v" version "...HEAD"
+      if (previous == "0.0.0") {
+        print "[" version "]: " repository_url "/releases/tag/v" version
+      } else {
+        print "[" version "]: " repository_url "/compare/v" previous "...v" version
+      }
+      updated = 1
+      next
+    }
+    { print }
+  ' "$temporary_file" > "$links_file"
+  mv "$links_file" "$temporary_file"
+else
+  {
+    printf '\n[Unreleased]: %s/compare/v%s...HEAD\n' "$repository_url" "$BUMPSTER_NEW_VERSION"
+    if [ "$BUMPSTER_PREV_VERSION" = "0.0.0" ]; then
+      printf '[%s]: %s/releases/tag/v%s\n' \
+        "$BUMPSTER_NEW_VERSION" "$repository_url" "$BUMPSTER_NEW_VERSION"
+    else
+      printf '[%s]: %s/compare/v%s...v%s\n' \
+        "$BUMPSTER_NEW_VERSION" "$repository_url" \
+        "$BUMPSTER_PREV_VERSION" "$BUMPSTER_NEW_VERSION"
+    fi
+  } >> "$temporary_file"
+fi
+
+chmod 0644 "$temporary_file"
+mv "$temporary_file" "$changelog_file"
+trap - EXIT

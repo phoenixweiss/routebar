@@ -1,0 +1,28 @@
+#!/bin/sh
+
+set -eu
+
+project_dir=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd -P)
+plugin_dir=$(defaults read com.ameba.SwiftBar PluginDirectory 2>/dev/null || true)
+
+remove_owned_link() {
+  source_path=$1
+  target_path=$2
+
+  if [ ! -L "$target_path" ]; then
+    return
+  fi
+  if [ "$(readlink "$target_path")" != "$source_path" ]; then
+    echo "Refusing to remove link with an unexpected target: $target_path" >&2
+    exit 1
+  fi
+  unlink "$target_path"
+}
+
+remove_owned_link "$project_dir/.build/debug/routebar" "$HOME/.local/bin/routebar"
+if [ -n "$plugin_dir" ]; then
+  remove_owned_link "$project_dir/SwiftBar/routebar.1m.sh" "$plugin_dir/routebar.1m.sh"
+fi
+
+open "swiftbar://refreshallplugins"
+echo "RouteBar development links removed."

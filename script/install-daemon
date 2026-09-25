@@ -1,0 +1,90 @@
+#!/bin/sh
+
+set -eu
+
+project_dir=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd -P)
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+  echo "Usage: script/install-daemon PROFILE_ID [CONFIG_PATH]" >&2
+  exit 64
+fi
+
+profile_id=$1
+config_path=${2:-"$HOME/.config/routebar/config.yaml"}
+label=io.github.phoenixweiss.routebar
+binary_path=/Library/PrivilegedHelperTools/io.github.phoenixweiss.routebar
+plist_path=/Library/LaunchDaemons/io.github.phoenixweiss.routebar.plist
+template_path="$project_dir/Support/io.github.phoenixweiss.routebar.plist"
+
+case "$config_path" in
+  /*) ;;
+  *)
+    echo "Configuration path must be absolute: $config_path" >&2
+    exit 1
+    ;;
+esac
+
+swift build --package-path "$project_dir" -c release
+binary_source="$project_dir/.build/release/routebar"
+
+"$binary_source" validate --config "$config_path"
+"$binary_source" plan --config "$config_path" --profile "$profile_id" >/dev/null
+
+temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/routebar-install.XXXXXX")
+temporary_plist="$temporary_dir/$label.plist"
+cleanup_temporary_files() {
+  rm -f "$temporary_plist" 2>/dev/null || true
+  rmdir "$temporary_dir" 2>/dev/null || true
+}
+trap cleanup_temporary_files EXIT
+trap 'exit 1' HUP INT TERM
+
+cp "$template_path" "$temporary_plist"
+plutil -remove ProgramArguments.5 "$temporary_plist"
+plutil -insert ProgramArguments.5 -string "$config_path" "$temporary_plist"
+plutil -remove ProgramArguments.7 "$temporary_plist"
+plutil -insert ProgramArguments.7 -string "$profile_id" "$temporary_plist"
+plutil -lint "$temporary_plist" >/dev/null
+
+configured_path=$(plutil -extract ProgramArguments.5 raw -o - "$temporary_plist")
+configured_profile=$(plutil -extract ProgramArguments.7 raw -o - "$temporary_plist")
+if [ "$configured_path" != "$config_path" ] || [ "$configured_profile" != "$profile_id" ]; then
+  echo "Generated launch daemon arguments do not match the requested configuration." >&2
+  exit 1
+fi
+if plutil -extract ProgramArguments.8 raw -o - "$temporary_plist" >/dev/null 2>&1; then
+  echo "Generated launch daemon contains unexpected extra arguments." >&2
+  exit 1
+fi
+
+if [ -e "$plist_path" ]; then
+  installed_label=$(plutil -extract Label raw -o - "$plist_path" 2>/dev/null || true)
+  if [ "$installed_label" != "$label" ]; then
+    echo "Refusing to replace an unexpected launch daemon: $plist_path" >&2
+    exit 1
+  fi
+fi
+
+if sudo launchctl print "system/$label" >/dev/null 2>&1; then
+  sudo launchctl bootout "system/$label"
+fi
+
+sudo install -d -o root -g wheel -m 0700 /var/db/routebar
+sudo install -o root -g wheel -m 0755 "$binary_source" "$binary_path"
+sudo install -o root -g wheel -m 0644 "$temporary_plist" "$plist_path"
+
+sudo "$binary_path" reconcile \
+  --adopt-existing \
+  --quiet \
+  --config "$config_path" \
+  --profile "$profile_id"
+sudo "$binary_path" reconcile \
+  --apply \
+  --quiet \
+  --config "$config_path" \
+  --profile "$profile_id"
+
+sudo launchctl bootstrap system "$plist_path"
+
+echo "RouteBar automatic reconciliation is installed."
+echo "Profile: $profile_id"
+echo "Configuration: $config_path"
