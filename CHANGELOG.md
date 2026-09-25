@@ -8,6 +8,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- The macOS app icon now uses a warm light tile and a larger RouteBar mark for
+  clearer recognition in the Dock and at small sizes.
+- The main status window now uses the RouteBar lockup, bundled Manrope type,
+  larger text, clearer information hierarchy, and a more compact native layout.
+- Window buttons now match the intended control size, and the menu-bar entry uses
+  a persistent native status item so it remains available alongside the Dock icon.
+
 ## [0.1.2] - 2026-09-25
 
 ### Changed

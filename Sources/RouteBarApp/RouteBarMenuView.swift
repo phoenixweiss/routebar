@@ -3,6 +3,7 @@ import SwiftUI
 
 struct RouteBarMenuView: View {
   @ObservedObject var model: RouteBarAppModel
+  var onAction: () -> Void = {}
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -51,6 +52,7 @@ struct RouteBarMenuView: View {
     VStack(spacing: 0) {
       HStack(spacing: 12) {
         Button("Open Window") {
+          onAction()
           model.showStatusWindow()
         }
         .keyboardShortcut("o", modifiers: .command)
@@ -67,11 +69,13 @@ struct RouteBarMenuView: View {
 
       HStack(spacing: 14) {
         Button("Open Config") {
+          onAction()
           model.openConfiguration()
         }
         .buttonStyle(.plain)
 
         Button("Show in Finder") {
+          onAction()
           model.revealConfiguration()
         }
         .buttonStyle(.plain)
@@ -80,6 +84,7 @@ struct RouteBarMenuView: View {
         Spacer()
 
         Button("Quit") {
+          onAction()
           model.quit()
         }
         .buttonStyle(.plain)

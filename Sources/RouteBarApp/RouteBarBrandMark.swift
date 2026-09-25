@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct RouteBarMenuBarSymbol: View {
+struct RouteBarBrandMark: View {
   var body: some View {
     Canvas { context, size in
       let scale = min(size.width, size.height) / 64
@@ -13,11 +13,6 @@ struct RouteBarMenuBarSymbol: View {
         lineCap: .round,
         lineJoin: .round
       )
-      let knockoutStyle = StrokeStyle(
-        lineWidth: 6 * scale,
-        lineCap: .round,
-        lineJoin: .round
-      )
 
       context.stroke(
         Path(
@@ -27,7 +22,7 @@ struct RouteBarMenuBarSymbol: View {
             width: 40 * scale,
             height: 40 * scale
           )),
-        with: .color(.primary),
+        with: .color(Color(red: 0.09, green: 0.25, blue: 0.30)),
         lineWidth: 3.333 * scale
       )
 
@@ -42,24 +37,9 @@ struct RouteBarMenuBarSymbol: View {
           curveEnd: CGPoint(x: 40, y: 32),
           endY: 32
         ),
-        with: .color(.primary),
+        with: .color(Color(red: 0.47, green: 0.79, blue: 0.26)),
         style: routeStyle
       )
-
-      context.blendMode = .destinationOut
-      context.stroke(
-        curvePath(
-          origin: origin,
-          scale: scale,
-          start: CGPoint(x: 32, y: 32),
-          firstControl: CGPoint(x: 35, y: 37),
-          secondControl: CGPoint(x: 37, y: 42),
-          end: CGPoint(x: 40, y: 42)
-        ),
-        with: .color(.black),
-        style: knockoutStyle
-      )
-      context.blendMode = .normal
 
       context.stroke(
         routePath(
@@ -72,24 +52,9 @@ struct RouteBarMenuBarSymbol: View {
           curveEnd: CGPoint(x: 40, y: 42),
           endY: 42
         ),
-        with: .color(.primary),
+        with: .color(Color(red: 0.18, green: 0.42, blue: 1.0)),
         style: routeStyle
       )
-
-      context.blendMode = .destinationOut
-      context.stroke(
-        curvePath(
-          origin: origin,
-          scale: scale,
-          start: CGPoint(x: 24, y: 32),
-          firstControl: CGPoint(x: 27.5, y: 32),
-          secondControl: CGPoint(x: 28.5, y: 22),
-          end: CGPoint(x: 32, y: 22)
-        ),
-        with: .color(.black),
-        style: knockoutStyle
-      )
-      context.blendMode = .normal
 
       context.stroke(
         routePath(
@@ -102,11 +67,10 @@ struct RouteBarMenuBarSymbol: View {
           curveEnd: CGPoint(x: 32, y: 22),
           endY: 22
         ),
-        with: .color(.primary),
+        with: .color(Color(red: 1.0, green: 0.44, blue: 0.30)),
         style: routeStyle
       )
     }
-    .frame(width: 18, height: 18)
     .accessibilityLabel("RouteBar")
   }
 
@@ -129,24 +93,6 @@ struct RouteBarMenuBarSymbol: View {
       control2: point(secondControl.x, secondControl.y, origin: origin, scale: scale)
     )
     path.addLine(to: point(57, endY, origin: origin, scale: scale))
-    return path
-  }
-
-  private func curvePath(
-    origin: CGPoint,
-    scale: CGFloat,
-    start: CGPoint,
-    firstControl: CGPoint,
-    secondControl: CGPoint,
-    end: CGPoint
-  ) -> Path {
-    var path = Path()
-    path.move(to: point(start.x, start.y, origin: origin, scale: scale))
-    path.addCurve(
-      to: point(end.x, end.y, origin: origin, scale: scale),
-      control1: point(firstControl.x, firstControl.y, origin: origin, scale: scale),
-      control2: point(secondControl.x, secondControl.y, origin: origin, scale: scale)
-    )
     return path
   }
 

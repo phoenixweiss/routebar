@@ -19,8 +19,13 @@ plutil -lint Support/io.github.phoenixweiss.routebar.plist >/dev/null
 plutil -lint Support/RouteBarApp-Info.plist >/dev/null
 plutil -lint Support/io.github.phoenixweiss.routebar.menu.plist >/dev/null
 test -s Support/RouteBar.icns
+test -s Support/Fonts/Manrope-Variable.ttf
+test -s Support/Fonts/OFL.txt
+test -s Support/Fonts/SOURCE.md
 test "$(plutil -extract CFBundleIconFile raw -o - Support/RouteBarApp-Info.plist)" = \
   "RouteBar.icns"
+test "$(plutil -extract ATSApplicationFontsPath raw -o - Support/RouteBarApp-Info.plist)" = \
+  "Fonts"
 grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' VERSION
 grep -Fqx '## [Unreleased]' CHANGELOG.md
 git diff --check

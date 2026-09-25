@@ -26,7 +26,7 @@ cleanup_temporary_files() {
 trap cleanup_temporary_files EXIT
 trap 'exit 1' HUP INT TERM
 
-mkdir -p "$temporary_app/Contents/MacOS" "$temporary_app/Contents/Resources"
+mkdir -p "$temporary_app/Contents/MacOS" "$temporary_app/Contents/Resources/Fonts"
 cp "$project_dir/Support/RouteBarApp-Info.plist" "$temporary_app/Contents/Info.plist"
 plutil -replace CFBundleShortVersionString -string "$version" "$temporary_app/Contents/Info.plist"
 plutil -replace CFBundleVersion -string "$version" "$temporary_app/Contents/Info.plist"
@@ -34,6 +34,12 @@ install -m 0755 "$project_dir/.build/release/routebar-app" \
   "$temporary_app/Contents/MacOS/routebar-app"
 install -m 0644 "$project_dir/Support/RouteBar.icns" \
   "$temporary_app/Contents/Resources/RouteBar.icns"
+install -m 0644 "$project_dir/Support/Fonts/Manrope-Variable.ttf" \
+  "$temporary_app/Contents/Resources/Fonts/Manrope-Variable.ttf"
+install -m 0644 "$project_dir/Support/Fonts/OFL.txt" \
+  "$temporary_app/Contents/Resources/Fonts/OFL.txt"
+install -m 0644 "$project_dir/Support/Fonts/SOURCE.md" \
+  "$temporary_app/Contents/Resources/Fonts/SOURCE.md"
 plutil -lint "$temporary_app/Contents/Info.plist" >/dev/null
 codesign --force --deep --sign - "$temporary_app" >/dev/null
 

@@ -4,28 +4,31 @@ import SwiftUI
 @main
 struct RouteBarApp: App {
   @NSApplicationDelegateAdaptor(RouteBarAppDelegate.self) private var appDelegate
-  @StateObject private var model = RouteBarApplicationController.shared.model
 
   var body: some Scene {
-    MenuBarExtra {
-      RouteBarMenuView(model: model)
-    } label: {
-      RouteBarMenuBarSymbol()
-        .task {
-          await model.startPolling()
-        }
+    Settings {
+      EmptyView()
     }
-    .menuBarExtraStyle(.window)
   }
 }
 
 @MainActor
 final class RouteBarAppDelegate: NSObject, NSApplicationDelegate {
+  private var statusItemController: RouteBarStatusItemController?
+  private var pollingTask: Task<Void, Never>?
+
   func applicationDidFinishLaunching(_ notification: Notification) {
-    RouteBarApplicationController.shared.applyDockVisibility()
+    let controller = RouteBarApplicationController.shared
+    statusItemController = RouteBarStatusItemController(model: controller.model)
+    pollingTask = Task { await controller.model.startPolling() }
+    controller.applyDockVisibility()
     if !CommandLine.arguments.contains("--background") {
-      RouteBarApplicationController.shared.showStatusWindow()
+      controller.showStatusWindow()
     }
+  }
+
+  func applicationWillTerminate(_ notification: Notification) {
+    pollingTask?.cancel()
   }
 
   func applicationShouldHandleReopen(
@@ -48,7 +51,7 @@ final class RouteBarApplicationController: NSObject, NSWindowDelegate {
     if statusWindowController == nil {
       let content = RouteBarStatusView(model: model)
       let window = NSWindow(
-        contentRect: NSRect(x: 0, y: 0, width: 460, height: 560),
+        contentRect: NSRect(x: 0, y: 0, width: 510, height: 660),
         styleMask: [.titled, .closable, .miniaturizable, .resizable],
         backing: .buffered,
         defer: false
@@ -56,9 +59,9 @@ final class RouteBarApplicationController: NSObject, NSWindowDelegate {
       window.title = "RouteBar"
       window.contentViewController = NSHostingController(rootView: content)
       window.isReleasedWhenClosed = false
-      window.minSize = NSSize(width: 380, height: 420)
-      window.setContentSize(NSSize(width: 460, height: 560))
-      window.setFrameAutosaveName("RouteBarStatusWindowV2")
+      window.minSize = NSSize(width: 470, height: 560)
+      window.setContentSize(NSSize(width: 510, height: 660))
+      window.setFrameAutosaveName("RouteBarStatusWindowV4")
       window.center()
       window.delegate = self
       statusWindowController = NSWindowController(window: window)
