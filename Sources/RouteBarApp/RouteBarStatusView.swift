@@ -9,6 +9,7 @@ struct RouteBarStatusView: View {
   @State private var showingApplyConfirmation = false
   @State private var showingDisableConfirmation = false
   @State private var showingUpdateConfirmation = false
+  @State private var showingDiagnostics = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -75,6 +76,9 @@ struct RouteBarStatusView: View {
         "RouteBar will briefly stop the old service and register the helper bundled with this app. Existing routes, YAML, selected profile, and RouteBar-owned state will be preserved."
       )
     }
+    .sheet(isPresented: $showingDiagnostics) {
+      RouteBarDiagnosticsView(diagnostics: model.diagnostics())
+    }
   }
 
   private var productToolbar: some View {
@@ -88,6 +92,13 @@ struct RouteBarStatusView: View {
         .foregroundStyle(brandInk)
 
       Spacer(minLength: 20)
+
+      Button("Diagnostics") {
+        showingDiagnostics = true
+      }
+      .font(routeBarFont(13, weight: .medium))
+      .controlSize(.large)
+      .help("Show a safe technical summary")
 
       Button("Refresh") {
         Task { await model.refresh() }

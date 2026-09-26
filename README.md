@@ -50,6 +50,8 @@ On first launch, Control-click RouteBar, choose **Open**, and confirm the launch
 - reloads edited YAML immediately with a visible applied or rejected result;
 - reports the last reconciliation result and warns while an edited YAML revision
   is still waiting for daemon confirmation;
+- provides a compact Diagnostics sheet and a redacted report for issues without
+  domains, network addresses, SSIDs, paths, or YAML contents;
 - updates or disables the bundled service without deleting the YAML;
 - removes only routes still matching RouteBar's own root-owned state.
 
@@ -125,6 +127,9 @@ Build and install the current app for the signed-in user:
 ```bash
 script/install-app
 ```
+
+Use `script/install-app --background` to replace and restart the app without
+opening its status window or interrupting another Space.
 
 Build an app bundle or local release DMG without installing it:
 

@@ -686,6 +686,20 @@ final class RouteBarAppModel: ObservableObject {
     launchAtLoginManager.openSystemSettings()
   }
 
+  func diagnostics(generatedAt: Date = Date()) -> RouteBarDiagnostics {
+    RouteBarDiagnostics(
+      generatedAt: generatedAt,
+      appVersion: appVersion,
+      systemVersion: ProcessInfo.processInfo.operatingSystemVersionString,
+      architecture: RouteBarRuntimeArchitecture.current,
+      state: state,
+      installedDaemon: installedDaemon,
+      bundledDaemonStatus: bundledDaemonStatus,
+      bundledDaemonConnectionStatus: bundledDaemonConnectionStatus,
+      reconciliationDiagnostics: reconciliationDiagnostics
+    )
+  }
+
   func openConfiguration() {
     NSWorkspace.shared.open(configurationURL)
   }
@@ -695,7 +709,7 @@ final class RouteBarAppModel: ObservableObject {
   }
 
   func showStatusWindow() {
-    RouteBarApplicationController.shared.showStatusWindow()
+    RouteBarApplicationController.shared.handleStatusWindowRequest(.explicitUserAction)
   }
 
   func quit() {

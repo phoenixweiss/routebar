@@ -20,9 +20,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   applied or rejected result instead of waiting for the next 30-second cycle.
 - Automatic routing now reports its last reconciliation result and error, and
   warns when an edited YAML revision has not yet been confirmed by the daemon.
+- A compact Diagnostics sheet shows safe runtime state and copies a redacted
+  issue report without domains, network addresses, SSIDs, paths, or YAML data.
 
 ### Changed
 
+- Local development installs can now restart RouteBar in the background without
+  opening its status window over the current Space.
 - Route application, automatic reconciliation, cleanup, and daemon removal are
   serialized and fail closed on conflicts or overlapping operations.
 - A bundled service version mismatch can be repaired from the app by restarting
@@ -33,6 +37,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- Window presentation now follows an explicit launch and user-action policy,
+  with regression coverage preventing background events from surfacing the app.
 - A healthy legacy daemon now appears as normal active automation instead of a
   warning or required migration; the unavailable built-in service remains
   visible as a neutral secondary status.

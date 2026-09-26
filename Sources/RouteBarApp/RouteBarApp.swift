@@ -49,9 +49,9 @@ final class RouteBarAppDelegate: NSObject, NSApplicationDelegate {
     statusItemController = RouteBarStatusItemController(model: controller.model)
     pollingTask = Task { await controller.model.startPolling() }
     controller.applyDockVisibility()
-    if !CommandLine.arguments.contains("--background") {
-      controller.showStatusWindow()
-    }
+    let request: RouteBarWindowPresentationRequest =
+      CommandLine.arguments.contains("--background") ? .backgroundLaunch : .foregroundLaunch
+    controller.handleStatusWindowRequest(request)
   }
 
   func applicationWillTerminate(_ notification: Notification) {
@@ -62,8 +62,9 @@ final class RouteBarAppDelegate: NSObject, NSApplicationDelegate {
     _ sender: NSApplication,
     hasVisibleWindows flag: Bool
   ) -> Bool {
-    guard sender.isActive, !flag else { return false }
-    RouteBarApplicationController.shared.showStatusWindow(activateApplication: false)
+    RouteBarApplicationController.shared.handleStatusWindowRequest(
+      .dockReopen(applicationIsActive: sender.isActive, hasVisibleWindows: flag)
+    )
     return false
   }
 }
@@ -75,7 +76,9 @@ final class RouteBarApplicationController: NSObject, NSWindowDelegate {
   let model = RouteBarAppModel()
   private var statusWindowController: NSWindowController?
 
-  func showStatusWindow(activateApplication: Bool = true) {
+  func handleStatusWindowRequest(_ request: RouteBarWindowPresentationRequest) {
+    guard let presentation = request.presentation else { return }
+
     if statusWindowController == nil {
       let content = RouteBarStatusView(model: model)
       let window = NSWindow(
@@ -96,7 +99,7 @@ final class RouteBarApplicationController: NSObject, NSWindowDelegate {
     }
 
     applyDockVisibility()
-    if activateApplication {
+    if presentation == .activateApplication {
       NSApplication.shared.activate(ignoringOtherApps: true)
     }
     statusWindowController?.showWindow(nil)

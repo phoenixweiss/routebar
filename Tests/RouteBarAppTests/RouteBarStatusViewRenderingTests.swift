@@ -301,6 +301,47 @@ final class RouteBarStatusViewRenderingTests: XCTestCase {
   }
 
   @MainActor
+  func testDiagnosticsScreenRendersAtSupportedWindowSizes() throws {
+    let diagnostics = RouteBarDiagnostics(
+      generatedAt: Date(timeIntervalSince1970: 1_700_000_000),
+      appVersion: "1.2.3",
+      systemVersion: "macOS 26.0",
+      architecture: "Apple silicon",
+      state: .ready(
+        sampleSnapshot(
+          daemon: DaemonRuntimeStatus(
+            installed: true,
+            loaded: true,
+            runs: 42,
+            lastExitCode: 0,
+            intervalSeconds: 30
+          ),
+          routesActive: true
+        ),
+        configURL: URL(fileURLWithPath: "/tmp/config.yaml")
+      ),
+      installedDaemon: .legacy(
+        InstalledDaemonConfiguration(
+          configURL: URL(fileURLWithPath: "/tmp/config.yaml"),
+          profileID: "sample"
+        )
+      ),
+      bundledDaemonStatus: .notRegistered,
+      bundledDaemonConnectionStatus: .notApplicable,
+      reconciliationDiagnostics: .unknown
+    )
+
+    try assertRenders(
+      RouteBarDiagnosticsView(diagnostics: diagnostics),
+      outputPrefix: "routebar-diagnostics",
+      sizes: [
+        NSSize(width: 480, height: 560),
+        NSSize(width: 440, height: 500),
+      ]
+    )
+  }
+
+  @MainActor
   func testLegacyDaemonMigrationPreflightRendersAtSupportedWindowSizes() throws {
     let configuration = InstalledDaemonConfiguration(
       configURL: URL(fileURLWithPath: "/tmp/config.yaml"),

@@ -2,6 +2,23 @@
 
 set -eu
 
+launch_in_background=false
+case "${1:-}" in
+  "") ;;
+  --background)
+    launch_in_background=true
+    shift
+    ;;
+  *)
+    echo "Usage: script/install-app [--background]" >&2
+    exit 2
+    ;;
+esac
+if [ "$#" -ne 0 ]; then
+  echo "Usage: script/install-app [--background]" >&2
+  exit 2
+fi
+
 project_dir=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd -P)
 bundle_id=io.github.phoenixweiss.routebar.menu
 legacy_bundle_id=io.github.phoenixweiss.routebar.app
@@ -90,9 +107,14 @@ mv "$temporary_app" "$app_path"
 if [ "$restore_launch_at_login" = true ]; then
   "$executable_path" --register-login-item
 fi
-open "$app_path"
+if [ "$launch_in_background" = true ]; then
+  open -gj "$app_path" --args --background
+  echo "RouteBar menu was installed and started in the background."
+else
+  open "$app_path"
+  echo "RouteBar menu and status window are installed and open."
+fi
 
-echo "RouteBar menu and status window are installed and open."
 echo "Application: $app_path"
 if [ "$restore_launch_at_login" = true ]; then
   echo "Launch at Login was migrated to the bundled login item."
