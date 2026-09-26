@@ -8,6 +8,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-27
+
 ### Added
 
 - The app can register, configure, explicitly apply, reconcile, and safely
@@ -145,7 +147,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Privileged route state is restricted to a fixed root-owned path instead of a
   caller-selected location.
 
-[Unreleased]: https://github.com/phoenixweiss/routebar/compare/v0.2.6...HEAD
+[Unreleased]: https://github.com/phoenixweiss/routebar/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/phoenixweiss/routebar/compare/v0.2.6...v0.3.0
 [0.2.6]: https://github.com/phoenixweiss/routebar/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/phoenixweiss/routebar/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/phoenixweiss/routebar/compare/v0.2.3...v0.2.4

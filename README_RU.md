@@ -23,7 +23,7 @@ Dock, запуск при входе, проверка YAML, выбор проф
 ## Скачать
 
 Последний публичный выпуск —
-[RouteBar 0.2.6](https://github.com/phoenixweiss/routebar/releases/tag/v0.2.6)
+[RouteBar 0.3.0](https://github.com/phoenixweiss/routebar/releases/tag/v0.3.0)
 для Mac с Apple silicon под управлением macOS 13 или новее. Скачайте DMG,
 откройте его и скопируйте RouteBar в «Программы». Вместе с выпуском публикуется
 контрольная сумма SHA-256.

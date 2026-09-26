@@ -23,7 +23,7 @@ explicit controls for automatic routing.
 ## Download
 
 The latest public release is
-[RouteBar 0.2.6](https://github.com/phoenixweiss/routebar/releases/tag/v0.2.6)
+[RouteBar 0.3.0](https://github.com/phoenixweiss/routebar/releases/tag/v0.3.0)
 for Apple silicon Macs running macOS 13 or later. Download the DMG, open it, and
 copy RouteBar to Applications. The release includes a SHA-256 checksum.
 
