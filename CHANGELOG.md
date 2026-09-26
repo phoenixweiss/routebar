@@ -8,6 +8,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- The macOS app no longer creates or restores an empty `RouteBar Settings`
+  window during foreground or background launch.
+
 ## [0.2.0] - 2026-09-25
 
 ### Changed

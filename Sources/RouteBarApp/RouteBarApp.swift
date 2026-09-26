@@ -2,13 +2,13 @@ import AppKit
 import SwiftUI
 
 @main
-struct RouteBarApp: App {
-  @NSApplicationDelegateAdaptor(RouteBarAppDelegate.self) private var appDelegate
-
-  var body: some Scene {
-    Settings {
-      EmptyView()
-    }
+struct RouteBarApp {
+  @MainActor
+  static func main() {
+    let application = NSApplication.shared
+    let delegate = RouteBarAppDelegate()
+    application.delegate = delegate
+    application.run()
   }
 }
 
