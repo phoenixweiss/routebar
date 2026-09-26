@@ -2,19 +2,15 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key>
+  <key>AssociatedBundleIdentifiers</key>
   <string>io.github.phoenixweiss.routebar.menu</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/usr/bin/open</string>
-    <string>-gj</string>
-    <string>__APP_PATH__</string>
-    <string>--args</string>
-    <string>--background</string>
-  </array>
-  <key>RunAtLoad</key>
-  <true/>
+  <key>BundleProgram</key>
+  <string>Contents/Resources/routebar-login-launcher</string>
+  <key>Label</key>
+  <string>io.github.phoenixweiss.routebar.login</string>
   <key>ProcessType</key>
   <string>Interactive</string>
+  <key>RunAtLoad</key>
+  <true/>
 </dict>
 </plist>

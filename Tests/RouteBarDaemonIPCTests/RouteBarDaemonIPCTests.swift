@@ -1,4 +1,5 @@
 import Foundation
+import RouteBarCore
 import Security
 import XCTest
 
@@ -131,15 +132,17 @@ final class RouteBarDaemonIPCTests: XCTestCase {
     }
   }
 
-  func testReadOnlyHandlerReturnsVersionAndUnconfiguredStatus() throws {
+  func testReadOnlyHandlerReturnsVersionAndUnconfiguredStatus() async throws {
     let handler = RouteBarDaemonReadOnlyHandler(helperVersion: "1.2.3")
+    let versionResponse = try await handler.response(for: .version)
+    let statusResponse = try await handler.response(for: .status)
 
     XCTAssertEqual(
-      try handler.response(for: .version),
+      versionResponse,
       .version(RouteBarDaemonVersion(helperVersion: "1.2.3"))
     )
     XCTAssertEqual(
-      try handler.response(for: .status),
+      statusResponse,
       .status(
         RouteBarDaemonStatus(
           helperVersion: "1.2.3",
@@ -149,7 +152,7 @@ final class RouteBarDaemonIPCTests: XCTestCase {
     )
   }
 
-  func testReadOnlyHandlerRejectsEveryMutatingRequest() {
+  func testReadOnlyHandlerRejectsEveryMutatingRequest() async {
     let handler = RouteBarDaemonReadOnlyHandler(helperVersion: "1.2.3")
     let requests: [RouteBarDaemonRequest] = [
       .configure(profileID: "work"),
@@ -158,13 +161,57 @@ final class RouteBarDaemonIPCTests: XCTestCase {
     ]
 
     for request in requests {
-      XCTAssertThrowsError(try handler.response(for: request)) {
-        XCTAssertEqual(
-          $0 as? RouteBarDaemonServiceError,
-          .operationUnavailableInReadOnlyService
-        )
+      do {
+        _ = try await handler.response(for: request)
+        XCTFail("Expected the read-only handler to reject \(request)")
+      } catch {
+        XCTAssertEqual(error as? RouteBarDaemonServiceError, .operationUnavailableInReadOnlyService)
       }
     }
+  }
+
+  func testConfiguredHandlerPersistsOnlyAValidatedProfile() async throws {
+    let rootURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("routebar-ipc-config-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: rootURL) }
+    let homeURL = rootURL.appendingPathComponent("home", isDirectory: true)
+    let configURL = homeURL.appendingPathComponent(
+      ".config/routebar/config.yaml",
+      isDirectory: false
+    )
+    try FileManager.default.createDirectory(
+      at: configURL.deletingLastPathComponent(),
+      withIntermediateDirectories: true
+    )
+    try Self.configurationFixture.write(to: configURL, atomically: true, encoding: .utf8)
+    let service = RouteBarDaemonConfigurationService(
+      settingsStore: FileRouteBarDaemonSettingsStore(
+        url: rootURL.appendingPathComponent("state/settings.json")
+      ),
+      homeResolver: TestHomeResolver(homeURL: homeURL)
+    )
+    let handler = RouteBarDaemonConfiguredHandler(
+      helperVersion: "1.2.3",
+      clientUID: 501,
+      configurationService: service
+    )
+    let configureResponse = try await handler.response(for: .configure(profileID: "work"))
+    let statusResponse = try await handler.response(for: .status)
+
+    XCTAssertEqual(
+      configureResponse,
+      .configured(profileID: "work")
+    )
+    XCTAssertEqual(
+      statusResponse,
+      .status(
+        RouteBarDaemonStatus(
+          helperVersion: "1.2.3",
+          configuredProfileID: "work"
+        )
+      )
+    )
+
   }
 
   func testRealXPCTransportReadsVersionAndStatusFromAnonymousListener() async throws {
@@ -361,6 +408,29 @@ final class RouteBarDaemonIPCTests: XCTestCase {
       errSecSuccess
     )
     return try XCTUnwrap(url as URL?)
+  }
+
+  private static let configurationFixture = """
+    version: 1
+    profiles:
+      - id: work
+        name: Work
+        match:
+          ssids: [Office]
+        groups: [services]
+    groups:
+      - id: services
+        name: Services
+        mode: bypass-vpn
+        addresses: [192.0.2.10]
+    """
+}
+
+private struct TestHomeResolver: UserHomeDirectoryResolving {
+  let homeURL: URL
+
+  func homeDirectory(for uid: UInt32) throws -> URL {
+    homeURL
   }
 }
 

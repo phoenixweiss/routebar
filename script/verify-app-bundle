@@ -26,15 +26,19 @@ version=$(tr -d '\n' < "$project_dir/VERSION")
 info_plist="$app_path/Contents/Info.plist"
 main_executable="$app_path/Contents/MacOS/routebar-app"
 daemon_executable="$app_path/Contents/Resources/routebar-daemon"
+login_launcher="$app_path/Contents/Resources/routebar-login-launcher"
 daemon_plist="$app_path/Contents/Library/LaunchDaemons/io.github.phoenixweiss.routebar.plist"
+login_plist="$app_path/Contents/Library/LaunchAgents/io.github.phoenixweiss.routebar.login.plist"
 
 test -d "$app_path"
 test -f "$info_plist"
 test -x "$main_executable"
 test -x "$daemon_executable"
+test -x "$login_launcher"
 test -f "$daemon_plist"
+test -f "$login_plist"
 
-plutil -lint "$info_plist" "$daemon_plist" >/dev/null
+plutil -lint "$info_plist" "$daemon_plist" "$login_plist" >/dev/null
 test "$(plutil -extract CFBundleShortVersionString raw -o - "$info_plist")" = "$version"
 test "$(plutil -extract CFBundleVersion raw -o - "$info_plist")" = "$version"
 test "$(plutil -extract CFBundleIdentifier raw -o - "$info_plist")" = \
@@ -61,8 +65,25 @@ if plutil -extract ProgramArguments raw -o - "$daemon_plist" >/dev/null 2>&1; th
   exit 1
 fi
 
+test "$(plutil -extract Label raw -o - "$login_plist")" = \
+  "io.github.phoenixweiss.routebar.login"
+test "$(plutil -extract BundleProgram raw -o - "$login_plist")" = \
+  "Contents/Resources/routebar-login-launcher"
+test "$(plutil -extract AssociatedBundleIdentifiers raw -o - "$login_plist")" = \
+  "io.github.phoenixweiss.routebar.menu"
+if plutil -extract Program raw -o - "$login_plist" >/dev/null 2>&1; then
+  echo "Bundled login agent plist must not contain Program." >&2
+  exit 1
+fi
+if plutil -extract ProgramArguments raw -o - "$login_plist" >/dev/null 2>&1; then
+  echo "Bundled login agent plist must not contain ProgramArguments." >&2
+  exit 1
+fi
+
 file "$main_executable" | grep -q "$architecture"
 file "$daemon_executable" | grep -q "$architecture"
+file "$login_launcher" | grep -q "$architecture"
+codesign --verify --strict --verbose=4 "$login_launcher"
 codesign --verify --strict --verbose=4 "$daemon_executable"
 codesign --verify --deep --strict --verbose=4 "$app_path"
 codesign -d -r- "$app_path" 2>&1 | grep -q 'designated => '

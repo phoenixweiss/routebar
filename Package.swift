@@ -13,6 +13,7 @@ let package = Package(
     .executable(name: "routebar", targets: ["RouteBarCLI"]),
     .executable(name: "routebar-app", targets: ["RouteBarApp"]),
     .executable(name: "routebar-daemon", targets: ["RouteBarDaemon"]),
+    .executable(name: "routebar-login-launcher", targets: ["RouteBarLoginLauncher"]),
   ],
   dependencies: [
     .package(url: "https://github.com/jpsim/Yams.git", from: "6.2.2")
@@ -42,13 +43,17 @@ let package = Package(
     ),
     .target(
       name: "RouteBarDaemonIPC",
+      dependencies: ["RouteBarCore"],
       linkerSettings: [
         .linkedFramework("Security")
       ]
     ),
     .executableTarget(
       name: "RouteBarDaemon",
-      dependencies: ["RouteBarDaemonIPC"]
+      dependencies: ["RouteBarCore", "RouteBarDaemonIPC"]
+    ),
+    .executableTarget(
+      name: "RouteBarLoginLauncher"
     ),
     .testTarget(
       name: "RouteBarCoreTests",

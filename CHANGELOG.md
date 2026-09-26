@@ -8,6 +8,25 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- The app can register, configure, explicitly apply, reconcile, and safely
+  disable its bundled routing daemon without requiring a source checkout.
+- Launch at login now uses an app-bundled `SMAppService` LaunchAgent and a fixed
+  background launcher instead of installing a plist in the user's Library.
+- The main window can reload YAML and reconcile routes immediately, with a clear
+  applied or rejected result instead of waiting for the next 30-second cycle.
+
+### Changed
+
+- Route application, automatic reconciliation, cleanup, and daemon removal are
+  serialized and fail closed on conflicts or overlapping operations.
+- A bundled service version mismatch can be repaired from the app by restarting
+  the registered helper while preserving the YAML, selected profile, active
+  routes, and RouteBar-owned state.
+- The English and Russian READMEs now use the RouteBar mark and describe the
+  current app, shipped release, development service flow, and real limitations.
+
 ## [0.2.6] - 2026-09-26
 
 ### Fixed

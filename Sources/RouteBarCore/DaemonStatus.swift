@@ -57,7 +57,7 @@ public struct SystemDaemonRuntimeInspector: DaemonRuntimeInspecting {
   public init() {}
 
   public func status() -> DaemonRuntimeStatus {
-    let installed = FileManager.default.fileExists(atPath: Self.plistURL.path)
+    let legacyFilesPresent = FileManager.default.fileExists(atPath: Self.plistURL.path)
     guard
       let result = try? FixedCommand.run(
         "/bin/launchctl",
@@ -65,9 +65,9 @@ public struct SystemDaemonRuntimeInspector: DaemonRuntimeInspecting {
       ),
       result.status == 0
     else {
-      return DaemonRuntimeStatus(installed: installed, loaded: false)
+      return DaemonRuntimeStatus(installed: legacyFilesPresent, loaded: false)
     }
-    return LaunchctlStatusParser.parse(result.standardOutput, installed: installed)
+    return LaunchctlStatusParser.parse(result.standardOutput, installed: true)
   }
 }
 

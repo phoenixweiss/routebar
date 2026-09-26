@@ -16,7 +16,6 @@ lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchSe
 
 temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/routebar-app-install.XXXXXX")
 temporary_app="$temporary_dir/RouteBar.app"
-temporary_agent="$temporary_dir/$label.plist"
 cleanup_temporary_files() {
   rm -rf "$temporary_dir" 2>/dev/null || true
 }
@@ -24,24 +23,6 @@ trap cleanup_temporary_files EXIT
 trap 'exit 1' HUP INT TERM
 
 "$project_dir/script/build-app" "$temporary_app"
-
-cp "$project_dir/Support/io.github.phoenixweiss.routebar.menu.plist" "$temporary_agent"
-plutil -remove ProgramArguments.2 "$temporary_agent"
-plutil -insert ProgramArguments.2 -string "$app_path" "$temporary_agent"
-plutil -lint "$temporary_agent" >/dev/null
-configured_launcher=$(plutil -extract ProgramArguments.0 raw -o - "$temporary_agent")
-configured_app=$(plutil -extract ProgramArguments.2 raw -o - "$temporary_agent")
-configured_mode=$(plutil -extract ProgramArguments.4 raw -o - "$temporary_agent")
-if [ "$configured_launcher" != "/usr/bin/open" ] \
-  || [ "$configured_app" != "$app_path" ] \
-  || [ "$configured_mode" != "--background" ]; then
-  echo "Generated launch agent does not contain the expected arguments." >&2
-  exit 1
-fi
-if plutil -extract ProgramArguments.5 raw -o - "$temporary_agent" >/dev/null 2>&1; then
-  echo "Generated launch agent contains unexpected extra arguments." >&2
-  exit 1
-fi
 
 if [ -e "$agent_path" ]; then
   installed_label=$(plutil -extract Label raw -o - "$agent_path" 2>/dev/null || true)
@@ -69,6 +50,11 @@ if [ -e "$app_path" ]; then
   fi
 fi
 
+installed_bundled_agent="$app_path/Contents/Library/LaunchAgents/io.github.phoenixweiss.routebar.login.plist"
+if [ -f "$installed_bundled_agent" ]; then
+  "$executable_path" --unregister-login-item
+fi
+
 if launchctl print "gui/$uid/$legacy_label" >/dev/null 2>&1; then
   launchctl bootout "gui/$uid/$legacy_label"
 fi
@@ -84,6 +70,9 @@ done
 if [ -e "$legacy_agent_path" ]; then
   unlink "$legacy_agent_path"
 fi
+if [ -e "$agent_path" ]; then
+  unlink "$agent_path"
+fi
 
 mkdir -p "$HOME/Applications"
 if [ -e "$app_path" ]; then
@@ -91,10 +80,8 @@ if [ -e "$app_path" ]; then
 fi
 mv "$temporary_app" "$app_path"
 "$lsregister" -f "$app_path"
-mkdir -p "$HOME/Library/LaunchAgents"
-install -m 0644 "$temporary_agent" "$agent_path"
-launchctl bootstrap "gui/$uid" "$agent_path"
 open "$app_path"
 
 echo "RouteBar menu and status window are installed and open."
 echo "Application: $app_path"
+echo "Enable Launch at Login in the RouteBar window if desired."

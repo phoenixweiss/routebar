@@ -28,6 +28,7 @@ fi
 
 swift build --package-path "$project_dir" -c release --product routebar-app
 swift build --package-path "$project_dir" -c release --product routebar-daemon
+swift build --package-path "$project_dir" -c release --product routebar-login-launcher
 
 temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/routebar-app-build.XXXXXX")
 temporary_app="$temporary_dir/RouteBar.app"
@@ -40,6 +41,7 @@ trap 'exit 1' HUP INT TERM
 mkdir -p \
   "$temporary_app/Contents/MacOS" \
   "$temporary_app/Contents/Resources/Fonts" \
+  "$temporary_app/Contents/Library/LaunchAgents" \
   "$temporary_app/Contents/Library/LaunchDaemons"
 cp "$project_dir/Support/RouteBarApp-Info.plist" "$temporary_app/Contents/Info.plist"
 plutil -replace CFBundleShortVersionString -string "$version" \
@@ -50,6 +52,10 @@ install -m 0755 "$project_dir/.build/release/routebar-app" \
   "$temporary_app/Contents/MacOS/routebar-app"
 install -m 0755 "$project_dir/.build/release/routebar-daemon" \
   "$temporary_app/Contents/Resources/routebar-daemon"
+install -m 0755 "$project_dir/.build/release/routebar-login-launcher" \
+  "$temporary_app/Contents/Resources/routebar-login-launcher"
+install -m 0644 "$project_dir/Support/io.github.phoenixweiss.routebar.login.plist" \
+  "$temporary_app/Contents/Library/LaunchAgents/io.github.phoenixweiss.routebar.login.plist"
 install -m 0644 "$project_dir/Support/io.github.phoenixweiss.routebar.bundled.plist" \
   "$temporary_app/Contents/Library/LaunchDaemons/io.github.phoenixweiss.routebar.plist"
 plutil -replace EnvironmentVariables.ROUTEBAR_HELPER_VERSION -string "$version" \
@@ -66,6 +72,7 @@ install -m 0644 "$project_dir/LICENSE" \
   "$temporary_app/Contents/Resources/LICENSE"
 
 plutil -lint "$temporary_app/Contents/Info.plist" >/dev/null
+codesign --force --sign - "$temporary_app/Contents/Resources/routebar-login-launcher" >/dev/null
 codesign --force --sign - "$temporary_app/Contents/Resources/routebar-daemon" >/dev/null
 codesign --force --sign - "$temporary_app" >/dev/null
 "$project_dir/script/verify-app-bundle" "$temporary_app"

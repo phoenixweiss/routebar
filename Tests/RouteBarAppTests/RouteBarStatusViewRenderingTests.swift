@@ -1,5 +1,6 @@
 import AppKit
 import RouteBarCore
+import RouteBarDaemonIPC
 import SwiftUI
 import XCTest
 
@@ -80,6 +81,175 @@ final class RouteBarStatusViewRenderingTests: XCTestCase {
   }
 
   @MainActor
+  func testPendingApprovalRendersAtSupportedWindowSizes() throws {
+    let model = RouteBarAppModel(
+      previewState: .ready(
+        sampleSnapshot(),
+        configURL: URL(fileURLWithPath: "/tmp/config.yaml")
+      ),
+      installedDaemon: .bundled,
+      bundledDaemonStatus: .requiresApproval,
+      profileOptions: [option(id: "sample", name: "Sample profile")],
+      selectedProfileID: "sample",
+      showInDock: true
+    )
+
+    try assertRenders(
+      RouteBarStatusView(model: model),
+      outputPrefix: "routebar-pending-approval"
+    )
+  }
+
+  @MainActor
+  func testReadyToConfigureRendersAtSupportedWindowSizes() throws {
+    let model = RouteBarAppModel(
+      previewState: .ready(
+        sampleSnapshot(),
+        configURL: URL(fileURLWithPath: "/tmp/config.yaml")
+      ),
+      installedDaemon: .bundled,
+      bundledDaemonStatus: .enabled,
+      bundledDaemonConnectionStatus: .connected(helperVersion: "1.2.3"),
+      profileOptions: [option(id: "sample", name: "Sample profile")],
+      selectedProfileID: "sample",
+      configuredProfileID: nil,
+      showInDock: true
+    )
+
+    try assertRenders(
+      RouteBarStatusView(model: model),
+      outputPrefix: "routebar-ready-to-configure"
+    )
+  }
+
+  @MainActor
+  func testReadyToApplyRendersAtSupportedWindowSizes() throws {
+    let model = RouteBarAppModel(
+      previewState: .ready(
+        sampleSnapshot(),
+        configURL: URL(fileURLWithPath: "/tmp/config.yaml")
+      ),
+      installedDaemon: .bundled,
+      bundledDaemonStatus: .enabled,
+      bundledDaemonConnectionStatus: .connected(helperVersion: "1.2.3"),
+      profileOptions: [option(id: "sample", name: "Sample profile")],
+      selectedProfileID: "sample",
+      configuredProfileID: "sample",
+      automaticReconciliationEnabled: false,
+      showInDock: true
+    )
+
+    try assertRenders(
+      RouteBarStatusView(model: model),
+      outputPrefix: "routebar-ready-to-apply"
+    )
+  }
+
+  @MainActor
+  func testActiveBundledDaemonRendersAtSupportedWindowSizes() throws {
+    let model = RouteBarAppModel(
+      previewState: .ready(
+        sampleSnapshot(
+          daemon: DaemonRuntimeStatus(
+            installed: true,
+            loaded: true,
+            runs: 42,
+            lastExitCode: 0,
+            intervalSeconds: 30
+          )
+        ),
+        configURL: URL(fileURLWithPath: "/tmp/config.yaml")
+      ),
+      installedDaemon: .bundled,
+      bundledDaemonStatus: .enabled,
+      bundledDaemonConnectionStatus: .connected(helperVersion: "1.2.3"),
+      profileOptions: [option(id: "sample", name: "Sample profile")],
+      selectedProfileID: "sample",
+      configuredProfileID: "sample",
+      automaticReconciliationEnabled: true,
+      configurationReloadState: .applied(
+        RouteBarDaemonOperationResult(
+          changedRouteCount: 1,
+          activeRouteCount: 2,
+          conflictCount: 0
+        ),
+        at: Date()
+      ),
+      launchAtLoginStatus: .enabled,
+      showInDock: true
+    )
+
+    try assertRenders(
+      RouteBarStatusView(model: model),
+      outputPrefix: "routebar-active-bundled-daemon",
+      sizes: [
+        NSSize(width: 510, height: 660),
+        NSSize(width: 470, height: 560),
+        NSSize(width: 510, height: 900),
+      ]
+    )
+  }
+
+  @MainActor
+  func testRejectedConfigurationRendersAtSupportedWindowSizes() throws {
+    let model = RouteBarAppModel(
+      previewState: .ready(
+        sampleSnapshot(
+          daemon: DaemonRuntimeStatus(
+            installed: true,
+            loaded: true,
+            runs: 42,
+            lastExitCode: 0,
+            intervalSeconds: 30
+          )
+        ),
+        configURL: URL(fileURLWithPath: "/tmp/config.yaml")
+      ),
+      installedDaemon: .bundled,
+      bundledDaemonStatus: .enabled,
+      bundledDaemonConnectionStatus: .connected(helperVersion: "1.2.3"),
+      profileOptions: [option(id: "sample", name: "Sample profile")],
+      selectedProfileID: "sample",
+      configuredProfileID: "sample",
+      automaticReconciliationEnabled: true,
+      configurationReloadState: .rejected(
+        "The YAML configuration contains an unknown field.",
+        at: Date()
+      ),
+      launchAtLoginStatus: .enabled,
+      showInDock: true
+    )
+
+    try assertRenders(
+      RouteBarStatusView(model: model),
+      outputPrefix: "routebar-rejected-configuration",
+      sizes: [
+        NSSize(width: 510, height: 660),
+        NSSize(width: 470, height: 560),
+        NSSize(width: 510, height: 900),
+      ]
+    )
+  }
+
+  @MainActor
+  func testLaunchAtLoginApprovalRendersAtSupportedWindowSizes() throws {
+    let model = RouteBarAppModel(
+      previewState: .ready(
+        sampleSnapshot(),
+        configURL: URL(fileURLWithPath: "/tmp/config.yaml")
+      ),
+      bundledDaemonStatus: .notRegistered,
+      launchAtLoginStatus: .requiresApproval,
+      showInDock: true
+    )
+
+    try assertRenders(
+      RouteBarStatusView(model: model),
+      outputPrefix: "routebar-login-approval"
+    )
+  }
+
+  @MainActor
   func testLegacyDaemonMigrationPreflightRendersAtSupportedWindowSizes() throws {
     let configuration = InstalledDaemonConfiguration(
       configURL: URL(fileURLWithPath: "/tmp/config.yaml"),
@@ -135,9 +305,10 @@ final class RouteBarStatusViewRenderingTests: XCTestCase {
   @MainActor
   private func assertRenders<Content: View>(
     _ content: Content,
-    outputPrefix: String
+    outputPrefix: String,
+    sizes: [NSSize] = [NSSize(width: 510, height: 660), NSSize(width: 470, height: 560)]
   ) throws {
-    for size in [NSSize(width: 510, height: 660), NSSize(width: 470, height: 560)] {
+    for size in sizes {
       let png = try render(content, at: size)
       XCTAssertGreaterThan(png.count, 10_000)
 

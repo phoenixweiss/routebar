@@ -5,6 +5,10 @@ import SwiftUI
 struct RouteBarStatusView: View {
   @ObservedObject var model: RouteBarAppModel
   @Environment(\.colorScheme) private var colorScheme
+  @State private var showingEnableConfirmation = false
+  @State private var showingApplyConfirmation = false
+  @State private var showingDisableConfirmation = false
+  @State private var showingUpdateConfirmation = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -19,6 +23,58 @@ struct RouteBarStatusView: View {
     }
     .frame(minWidth: 470, idealWidth: 510, minHeight: 560, idealHeight: 660)
     .background(Color(nsColor: .windowBackgroundColor))
+    .alert(
+      "Enable automatic routing?",
+      isPresented: $showingEnableConfirmation
+    ) {
+      Button("Cancel", role: .cancel) {}
+      Button("Continue") {
+        Task { await model.enableBundledDaemon() }
+      }
+    } message: {
+      Text(
+        "RouteBar will register its built-in system service. macOS may require administrator approval. The current route plan will remain unchanged until setup is complete."
+      )
+    }
+    .alert(
+      "Apply routes now?",
+      isPresented: $showingApplyConfirmation
+    ) {
+      Button("Cancel", role: .cancel) {}
+      Button("Apply Routes") {
+        Task { await model.applyConfiguredRoutes() }
+      }
+    } message: {
+      Text(
+        "RouteBar will apply only the explicit /32 host routes in the selected profile through the current physical gateway. It will then keep them reconciled every 30 seconds."
+      )
+    }
+    .alert(
+      "Disable automatic routing?",
+      isPresented: $showingDisableConfirmation
+    ) {
+      Button("Cancel", role: .cancel) {}
+      Button("Disable", role: .destructive) {
+        Task { await model.disableBundledDaemon() }
+      }
+    } message: {
+      Text(
+        "RouteBar will first stop automatic reconciliation and remove only routes recorded as its own. It will disable the built-in service only after cleanup succeeds. Your YAML configuration will remain untouched."
+      )
+    }
+    .alert(
+      "Update the built-in service?",
+      isPresented: $showingUpdateConfirmation
+    ) {
+      Button("Cancel", role: .cancel) {}
+      Button("Update Service") {
+        Task { await model.updateBundledDaemon() }
+      }
+    } message: {
+      Text(
+        "RouteBar will briefly stop the old service and register the helper bundled with this app. Existing routes, YAML, selected profile, and RouteBar-owned state will be preserved."
+      )
+    }
   }
 
   private var productToolbar: some View {
@@ -305,6 +361,139 @@ struct RouteBarStatusView: View {
           .fixedSize(horizontal: false, vertical: true)
           .padding(.top, 3)
       }
+
+      if canReloadConfiguration || canDisableBundledDaemon {
+        automationActions
+          .padding(.top, 12)
+      }
+
+      configurationReloadFeedback
+
+      if case .failed(let message) = model.bundledDaemonRemovalState {
+        Text(message)
+          .font(routeBarFont(13))
+          .foregroundStyle(.red)
+          .fixedSize(horizontal: false, vertical: true)
+          .padding(.top, 7)
+      }
+
+    }
+  }
+
+  @ViewBuilder
+  private var automationActions: some View {
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: 10) {
+        automationActionButtons
+      }
+
+      VStack(alignment: .leading, spacing: 10) {
+        automationActionButtons
+      }
+    }
+
+    switch model.bundledDaemonRemovalState {
+    case .cleaningRoutes:
+      automationProgress("Removing routes…")
+        .padding(.top, 8)
+    case .unregistering:
+      automationProgress("Disabling service…")
+        .padding(.top, 8)
+    case .idle, .failed:
+      EmptyView()
+    }
+  }
+
+  @ViewBuilder
+  private var automationActionButtons: some View {
+    if canReloadConfiguration {
+      Button("Reload Config") {
+        Task { await model.reloadConfiguration() }
+      }
+      .buttonStyle(.borderedProminent)
+      .tint(brandInk)
+      .controlSize(.large)
+      .disabled(
+        model.configurationReloadState.isInProgress
+          || model.bundledDaemonRemovalState.isInProgress
+          || model.isRefreshing
+      )
+      .help("Reload the YAML configuration and reconcile routes now")
+    }
+
+    if canDisableBundledDaemon {
+      Button("Disable Automatic Routing…") {
+        showingDisableConfirmation = true
+      }
+      .buttonStyle(.bordered)
+      .tint(.red)
+      .controlSize(.large)
+      .disabled(
+        model.bundledDaemonRemovalState.isInProgress
+          || model.configurationReloadState.isInProgress
+      )
+    }
+  }
+
+  private func automationProgress(_ label: String) -> some View {
+    HStack(spacing: 8) {
+      ProgressView()
+        .controlSize(.small)
+      Text(label)
+        .font(routeBarFont(13))
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  @ViewBuilder
+  private var configurationReloadFeedback: some View {
+    switch model.configurationReloadState {
+    case .idle:
+      EmptyView()
+    case .reloading:
+      automationProgress("Reloading configuration…")
+        .padding(.top, 9)
+    case .applied(let result, let completedAt):
+      configurationReloadResult(
+        symbol: "checkmark.circle.fill",
+        color: .green,
+        title: "Configuration reloaded and applied",
+        detail:
+          "\(result.activeRouteCount) active · \(result.changedRouteCount) changed · \(completedAt.formatted(date: .omitted, time: .standard))"
+      )
+      .padding(.top, 9)
+    case .rejected(let message, let completedAt):
+      configurationReloadResult(
+        symbol: "xmark.circle.fill",
+        color: .red,
+        title:
+          "Configuration rejected · \(completedAt.formatted(date: .omitted, time: .standard))",
+        detail: message
+      )
+      .padding(.top, 9)
+    }
+  }
+
+  private func configurationReloadResult(
+    symbol: String,
+    color: Color,
+    title: String,
+    detail: String
+  ) -> some View {
+    HStack(alignment: .top, spacing: 8) {
+      Image(systemName: symbol)
+        .font(.system(size: 13, weight: .semibold))
+        .foregroundStyle(color)
+        .padding(.top, 2)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(title)
+          .font(routeBarFont(13, weight: .medium))
+        Text(detail)
+          .font(routeBarFont(12.5))
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
     }
   }
 
@@ -354,6 +543,144 @@ struct RouteBarStatusView: View {
           profileSelectionControl
             .padding(.top, 8)
         }
+
+        firstRunAction
+          .padding(.top, 9)
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var firstRunAction: some View {
+    if !isLegacyDaemonInstallation && !isUnknownDaemonInstallation {
+      switch model.bundledDaemonStatus {
+      case .notRegistered:
+        if model.selectedProfileID != nil {
+          HStack(spacing: 10) {
+            Button("Enable Automatic Routing") {
+              showingEnableConfirmation = true
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(brandInk)
+            .controlSize(.large)
+            .disabled(model.bundledDaemonRegistrationState == .registering)
+
+            if model.bundledDaemonRegistrationState == .registering {
+              ProgressView()
+                .controlSize(.small)
+              Text("Registering…")
+                .font(routeBarFont(13))
+                .foregroundStyle(.secondary)
+            }
+          }
+        }
+      case .requiresApproval:
+        Button("Open Login Items") {
+          model.openLoginItemsSettings()
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(brandInk)
+        .controlSize(.large)
+      case .enabled:
+        if case .versionMismatch = model.bundledDaemonConnectionStatus {
+          HStack(spacing: 10) {
+            Button("Update Service…") {
+              showingUpdateConfirmation = true
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(brandInk)
+            .controlSize(.large)
+            .disabled(model.bundledDaemonUpdateState.isInProgress)
+
+            switch model.bundledDaemonUpdateState {
+            case .unregistering:
+              ProgressView()
+                .controlSize(.small)
+              Text("Stopping old service…")
+                .font(routeBarFont(13))
+                .foregroundStyle(.secondary)
+            case .registering:
+              ProgressView()
+                .controlSize(.small)
+              Text("Registering update…")
+                .font(routeBarFont(13))
+                .foregroundStyle(.secondary)
+            case .waitingForService:
+              ProgressView()
+                .controlSize(.small)
+              Text("Waiting for service…")
+                .font(routeBarFont(13))
+                .foregroundStyle(.secondary)
+            case .idle, .awaitingApproval, .completed, .failed:
+              EmptyView()
+            }
+          }
+        } else if case .connected = model.bundledDaemonConnectionStatus {
+          if model.configuredProfileID != model.selectedProfileID {
+            HStack(spacing: 10) {
+              Button("Use Selected Profile") {
+                Task { await model.configureBundledDaemon() }
+              }
+              .buttonStyle(.borderedProminent)
+              .tint(brandInk)
+              .controlSize(.large)
+              .disabled(model.bundledDaemonConfigurationState == .configuring)
+
+              if model.bundledDaemonConfigurationState == .configuring {
+                ProgressView()
+                  .controlSize(.small)
+                Text("Saving…")
+                  .font(routeBarFont(13))
+                  .foregroundStyle(.secondary)
+              }
+            }
+          } else if !model.automaticReconciliationEnabled {
+            HStack(spacing: 10) {
+              Button("Apply Routes") {
+                showingApplyConfirmation = true
+              }
+              .buttonStyle(.borderedProminent)
+              .tint(brandInk)
+              .controlSize(.large)
+              .disabled(model.bundledDaemonReconciliationState == .applying)
+
+              if model.bundledDaemonReconciliationState == .applying {
+                ProgressView()
+                  .controlSize(.small)
+                Text("Applying…")
+                  .font(routeBarFont(13))
+                  .foregroundStyle(.secondary)
+              }
+            }
+          }
+        }
+      case .checking, .notFound, .unknown:
+        EmptyView()
+      }
+
+      if case .failed(let message) = model.bundledDaemonRegistrationState {
+        Text(message)
+          .font(routeBarFont(13))
+          .foregroundStyle(.red)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      if case .failed(let message) = model.bundledDaemonConfigurationState {
+        Text(message)
+          .font(routeBarFont(13))
+          .foregroundStyle(.red)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      if case .failed(let message) = model.bundledDaemonReconciliationState {
+        Text(message)
+          .font(routeBarFont(13))
+          .foregroundStyle(.red)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      if case .failed(let message) = model.bundledDaemonUpdateState {
+        Text(message)
+          .font(routeBarFont(13))
+          .foregroundStyle(.red)
+          .fixedSize(horizontal: false, vertical: true)
       }
     }
   }
@@ -405,14 +732,16 @@ struct RouteBarStatusView: View {
         HStack(spacing: 10) {
           footerActions
           Spacer(minLength: 16)
-          dockToggle
+          preferenceToggles
         }
 
         VStack(alignment: .leading, spacing: 12) {
           footerActions
-          dockToggle
+          preferenceToggles
         }
       }
+
+      launchAtLoginFeedback
 
       Text(lastCheckedLabel)
         .font(routeBarFont(12.5))
@@ -442,11 +771,98 @@ struct RouteBarStatusView: View {
     .controlSize(.large)
   }
 
-  private var dockToggle: some View {
-    Toggle("Show in Dock", isOn: $model.showInDock)
-      .font(routeBarFont(13))
-      .toggleStyle(.switch)
-      .tint(brandInk)
+  private var preferenceToggles: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      preferenceToggle(
+        "Launch at Login",
+        isOn: launchAtLoginBinding,
+        disabled:
+          model.launchAtLoginStatus == .checking
+          || model.launchAtLoginStatus == .unavailable
+          || model.launchAtLoginMutationState == .updating
+      )
+
+      preferenceToggle("Show in Dock", isOn: $model.showInDock)
+    }
+    .frame(width: 190, alignment: .leading)
+    .font(routeBarFont(13))
+  }
+
+  private func preferenceToggle(
+    _ title: String,
+    isOn: Binding<Bool>,
+    disabled: Bool = false
+  ) -> some View {
+    HStack(spacing: 10) {
+      Text(title)
+      Spacer(minLength: 10)
+      Toggle(title, isOn: isOn)
+        .labelsHidden()
+        .toggleStyle(.switch)
+        .tint(brandInk)
+    }
+    .disabled(disabled)
+  }
+
+  private var launchAtLoginBinding: Binding<Bool> {
+    Binding(
+      get: { model.launchAtLoginStatus.isRegistered },
+      set: { enabled in
+        Task { await model.setLaunchAtLoginEnabled(enabled) }
+      }
+    )
+  }
+
+  @ViewBuilder
+  private var launchAtLoginFeedback: some View {
+    switch model.launchAtLoginMutationState {
+    case .updating:
+      HStack(spacing: 8) {
+        ProgressView()
+          .controlSize(.small)
+        Text("Updating launch at login…")
+          .foregroundStyle(.secondary)
+      }
+      .font(routeBarFont(12.5))
+    case .failed(let message):
+      Text(message)
+        .font(routeBarFont(12.5))
+        .foregroundStyle(.red)
+        .fixedSize(horizontal: false, vertical: true)
+    case .idle:
+      if model.launchAtLoginStatus == .requiresApproval {
+        ViewThatFits(in: .horizontal) {
+          HStack(spacing: 8) {
+            launchAtLoginApprovalText
+            openLoginItemsButton
+          }
+
+          VStack(alignment: .leading, spacing: 8) {
+            launchAtLoginApprovalText
+            openLoginItemsButton
+          }
+        }
+        .font(routeBarFont(12.5))
+      } else if model.launchAtLoginStatus == .unavailable {
+        Text("This build does not include the launch-at-login service.")
+          .font(routeBarFont(12.5))
+          .foregroundStyle(.red)
+      }
+    }
+  }
+
+  private var launchAtLoginApprovalText: some View {
+    Text("Approval is required in Login Items.")
+      .foregroundStyle(.orange)
+      .fixedSize(horizontal: false, vertical: true)
+  }
+
+  private var openLoginItemsButton: some View {
+    Button("Open Login Items") {
+      model.openLaunchAtLoginSettings()
+    }
+    .buttonStyle(.bordered)
+    .controlSize(.small)
   }
 
   private var statusSymbol: String {
@@ -717,7 +1133,10 @@ struct RouteBarStatusView: View {
       switch model.bundledDaemonConnectionStatus {
       case .versionMismatch, .unavailable:
         return true
-      case .notApplicable, .connected:
+      case .connected:
+        return model.configuredProfileID != model.selectedProfileID
+          || !model.automaticReconciliationEnabled
+      case .notApplicable:
         return false
       }
     }
@@ -742,6 +1161,10 @@ struct RouteBarStatusView: View {
         return "Built-in service version mismatch"
       case .unavailable:
         return "Built-in service is not responding"
+      case .connected where model.configuredProfileID != model.selectedProfileID:
+        return "Built-in service is ready"
+      case .connected where !model.automaticReconciliationEnabled:
+        return "Ready to apply routes"
       case .notApplicable, .connected:
         break
       }
@@ -771,6 +1194,12 @@ struct RouteBarStatusView: View {
       case .unavailable:
         return
           "macOS reports the service as enabled, but RouteBar could not reach it. No changes were applied."
+      case .connected where model.configuredProfileID != model.selectedProfileID:
+        return
+          "Confirm the selected profile for the built-in service. This step saves the profile but does not change routes."
+      case .connected where !model.automaticReconciliationEnabled:
+        return
+          "Review the route plan below, then apply it once to start automatic reconciliation."
       case .notApplicable, .connected:
         break
       }
@@ -806,5 +1235,24 @@ struct RouteBarStatusView: View {
 
   private var isUnknownDaemonInstallation: Bool {
     model.installedDaemon == .unknown
+  }
+
+  private var canDisableBundledDaemon: Bool {
+    guard model.bundledDaemonStatus == .enabled,
+      !model.bundledDaemonUpdateState.isInProgress
+    else { return false }
+    if case .connected = model.bundledDaemonConnectionStatus {
+      return true
+    }
+    return false
+  }
+
+  private var canReloadConfiguration: Bool {
+    guard canDisableBundledDaemon,
+      model.automaticReconciliationEnabled,
+      model.configuredProfileID != nil,
+      model.configuredProfileID == model.selectedProfileID
+    else { return false }
+    return true
   }
 }

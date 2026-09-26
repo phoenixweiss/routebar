@@ -27,7 +27,7 @@ public struct NetworkDiscoveryError: LocalizedError, Equatable {
   public var errorDescription: String? { message }
 }
 
-public protocol NetworkDiscovering {
+public protocol NetworkDiscovering: Sendable {
   func snapshot() throws -> NetworkSnapshot
 }
 

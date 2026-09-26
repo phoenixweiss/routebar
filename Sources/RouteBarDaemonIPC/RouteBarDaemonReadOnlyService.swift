@@ -1,4 +1,5 @@
 import Foundation
+import RouteBarCore
 
 public enum RouteBarDaemonServiceError: Error, LocalizedError, Equatable {
   case operationUnavailableInReadOnlyService
@@ -11,14 +12,20 @@ public enum RouteBarDaemonServiceError: Error, LocalizedError, Equatable {
   }
 }
 
-public struct RouteBarDaemonReadOnlyHandler: Sendable {
+public protocol RouteBarDaemonRequestHandling: Sendable {
+  func response(for request: RouteBarDaemonRequest) async throws -> RouteBarDaemonResponse
+}
+
+public struct RouteBarDaemonReadOnlyHandler: RouteBarDaemonRequestHandling {
   private let helperVersion: String
 
   public init(helperVersion: String) {
     self.helperVersion = helperVersion
   }
 
-  public func response(for request: RouteBarDaemonRequest) throws -> RouteBarDaemonResponse {
+  public func response(for request: RouteBarDaemonRequest) async throws
+    -> RouteBarDaemonResponse
+  {
     switch request {
     case .version:
       return .version(RouteBarDaemonVersion(helperVersion: helperVersion))
@@ -26,7 +33,8 @@ public struct RouteBarDaemonReadOnlyHandler: Sendable {
       return .status(
         RouteBarDaemonStatus(
           helperVersion: helperVersion,
-          configuredProfileID: nil
+          configuredProfileID: nil,
+          automaticReconciliationEnabled: false
         )
       )
     case .configure, .reconcile, .cleanup:
@@ -35,12 +43,82 @@ public struct RouteBarDaemonReadOnlyHandler: Sendable {
   }
 }
 
+public struct RouteBarDaemonConfiguredHandler: RouteBarDaemonRequestHandling {
+  private let helperVersion: String
+  private let clientUID: UInt32
+  private let configurationService: RouteBarDaemonConfigurationService
+  private let operationService: RouteBarDaemonOperationService
+
+  public init(
+    helperVersion: String,
+    clientUID: UInt32,
+    configurationService: RouteBarDaemonConfigurationService,
+    operationService: RouteBarDaemonOperationService? = nil
+  ) {
+    self.helperVersion = helperVersion
+    self.clientUID = clientUID
+    self.configurationService = configurationService
+    self.operationService =
+      operationService
+      ?? RouteBarDaemonOperationService(
+        configurationService: configurationService
+      )
+  }
+
+  public func response(for request: RouteBarDaemonRequest) async throws
+    -> RouteBarDaemonResponse
+  {
+    switch request {
+    case .version:
+      return .version(RouteBarDaemonVersion(helperVersion: helperVersion))
+    case .status:
+      let settings = try await configurationService.settings()
+      return .status(
+        RouteBarDaemonStatus(
+          helperVersion: helperVersion,
+          configuredProfileID: settings?.profileID,
+          automaticReconciliationEnabled:
+            settings?.automaticReconciliationEnabled ?? false
+        )
+      )
+    case .configure(let profileID):
+      let settings = try await operationService.configure(
+        clientUID: clientUID,
+        profileID: profileID
+      )
+      return .configured(profileID: settings.profileID)
+    case .reconcile:
+      return .reconciled(
+        Self.response(
+          try await operationService.reconcile(clientUID: clientUID)
+        )
+      )
+    case .cleanup:
+      return .cleanedUp(
+        Self.response(
+          try await operationService.cleanup(clientUID: clientUID)
+        )
+      )
+    }
+  }
+
+  private static func response(
+    _ summary: RouteBarDaemonOperationSummary
+  ) -> RouteBarDaemonOperationResult {
+    RouteBarDaemonOperationResult(
+      changedRouteCount: summary.changedRouteCount,
+      activeRouteCount: summary.activeRouteCount,
+      conflictCount: summary.conflictCount
+    )
+  }
+}
+
 public final class RouteBarDaemonXPCService: NSObject, RouteBarDaemonXPCServiceProtocol,
   @unchecked Sendable
 {
-  private let handler: RouteBarDaemonReadOnlyHandler
+  private let handler: any RouteBarDaemonRequestHandling
 
-  public init(handler: RouteBarDaemonReadOnlyHandler) {
+  public init(handler: any RouteBarDaemonRequestHandling) {
     self.handler = handler
   }
 
@@ -48,16 +126,20 @@ public final class RouteBarDaemonXPCService: NSObject, RouteBarDaemonXPCServiceP
     _ requestData: Data,
     withReply reply: @escaping (Data?, NSError?) -> Void
   ) {
-    do {
-      let request = try RouteBarDaemonWireCodec.decodeRequest(from: requestData)
-      let response = try handler.response(for: request)
-      reply(try RouteBarDaemonWireCodec.encode(response), nil)
-    } catch {
-      reply(nil, serviceError(error))
+    let replyBox = RouteBarDaemonXPCServiceReply(reply)
+    let handler = handler
+    Task {
+      do {
+        let request = try RouteBarDaemonWireCodec.decodeRequest(from: requestData)
+        let response = try await handler.response(for: request)
+        replyBox.call(try RouteBarDaemonWireCodec.encode(response), nil)
+      } catch {
+        replyBox.call(nil, Self.serviceError(error))
+      }
     }
   }
 
-  private func serviceError(_ error: Error) -> NSError {
+  private static func serviceError(_ error: Error) -> NSError {
     let description = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
     return NSError(
       domain: "io.github.phoenixweiss.routebar.daemon",
@@ -67,17 +149,37 @@ public final class RouteBarDaemonXPCService: NSObject, RouteBarDaemonXPCServiceP
   }
 }
 
+private final class RouteBarDaemonXPCServiceReply: @unchecked Sendable {
+  private let reply: (Data?, NSError?) -> Void
+
+  init(_ reply: @escaping (Data?, NSError?) -> Void) {
+    self.reply = reply
+  }
+
+  func call(_ data: Data?, _ error: NSError?) {
+    reply(data, error)
+  }
+}
+
 public final class RouteBarDaemonXPCListenerDelegate: NSObject, NSXPCListenerDelegate,
   @unchecked Sendable
 {
-  private let handler: RouteBarDaemonReadOnlyHandler
+  private let handlerFactory: @Sendable (UInt32) -> any RouteBarDaemonRequestHandling
   private let clientAuthenticator: any RouteBarDaemonClientAuthenticating
 
   public init(
-    handler: RouteBarDaemonReadOnlyHandler,
+    handler: any RouteBarDaemonRequestHandling,
     clientAuthenticator: any RouteBarDaemonClientAuthenticating
   ) {
-    self.handler = handler
+    handlerFactory = { _ in handler }
+    self.clientAuthenticator = clientAuthenticator
+  }
+
+  public init(
+    handlerFactory: @escaping @Sendable (UInt32) -> any RouteBarDaemonRequestHandling,
+    clientAuthenticator: any RouteBarDaemonClientAuthenticating
+  ) {
+    self.handlerFactory = handlerFactory
     self.clientAuthenticator = clientAuthenticator
   }
 
@@ -86,6 +188,7 @@ public final class RouteBarDaemonXPCListenerDelegate: NSObject, NSXPCListenerDel
     shouldAcceptNewConnection connection: NSXPCConnection
   ) -> Bool {
     guard clientAuthenticator.authenticate(connection) else { return false }
+    let handler = handlerFactory(UInt32(connection.effectiveUserIdentifier))
     connection.exportedInterface = NSXPCInterface(
       with: RouteBarDaemonXPCServiceProtocol.self
     )

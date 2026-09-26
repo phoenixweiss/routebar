@@ -1,8 +1,13 @@
 import Darwin
 import Dispatch
 import Foundation
+import RouteBarCore
 import RouteBarDaemonIPC
 
+let configurationService = RouteBarDaemonConfigurationService()
+let operationService = RouteBarDaemonOperationService(
+  configurationService: configurationService
+)
 let delegate: RouteBarDaemonXPCListenerDelegate
 do {
   let executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
@@ -17,7 +22,14 @@ do {
   )
   let helperVersion = ProcessInfo.processInfo.environment["ROUTEBAR_HELPER_VERSION"] ?? "unknown"
   delegate = RouteBarDaemonXPCListenerDelegate(
-    handler: RouteBarDaemonReadOnlyHandler(helperVersion: helperVersion),
+    handlerFactory: { clientUID in
+      RouteBarDaemonConfiguredHandler(
+        helperVersion: helperVersion,
+        clientUID: clientUID,
+        configurationService: configurationService,
+        operationService: operationService
+      )
+    },
     clientAuthenticator: authenticator
   )
 } catch {
@@ -29,4 +41,12 @@ let listener = NSXPCListener(
 )
 listener.delegate = delegate
 listener.resume()
+let reconciliationTimer = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
+reconciliationTimer.schedule(deadline: .now() + 30, repeating: 30)
+reconciliationTimer.setEventHandler {
+  Task {
+    _ = try? await operationService.reconcileAutomatically()
+  }
+}
+reconciliationTimer.resume()
 dispatchMain()

@@ -1,10 +1,24 @@
 import AppKit
+import Darwin
 import SwiftUI
 
 @main
 struct RouteBarApp {
   @MainActor
   static func main() {
+    if CommandLine.arguments.contains("--unregister-login-item") {
+      do {
+        _ = try SystemLaunchAtLoginManager().setEnabled(false)
+        exit(EXIT_SUCCESS)
+      } catch {
+        fputs(
+          "RouteBar could not unregister launch at login: \(error.localizedDescription)\n",
+          stderr
+        )
+        exit(EXIT_FAILURE)
+      }
+    }
+
     let application = NSApplication.shared
     let delegate = RouteBarAppDelegate()
     application.delegate = delegate

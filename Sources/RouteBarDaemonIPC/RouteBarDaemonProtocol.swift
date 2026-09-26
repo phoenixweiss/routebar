@@ -1,7 +1,7 @@
 import Foundation
 
 public enum RouteBarDaemonProtocolVersion {
-  public static let current = 1
+  public static let current = 2
 }
 
 public enum RouteBarDaemonRequest: Codable, Sendable, Equatable {
@@ -28,15 +28,18 @@ public struct RouteBarDaemonVersion: Codable, Sendable, Equatable {
 public struct RouteBarDaemonStatus: Codable, Sendable, Equatable {
   public let helperVersion: String
   public let configuredProfileID: String?
+  public let automaticReconciliationEnabled: Bool
   public let lastError: String?
 
   public init(
     helperVersion: String,
     configuredProfileID: String?,
+    automaticReconciliationEnabled: Bool = false,
     lastError: String? = nil
   ) {
     self.helperVersion = helperVersion
     self.configuredProfileID = configuredProfileID
+    self.automaticReconciliationEnabled = automaticReconciliationEnabled
     self.lastError = lastError
   }
 }

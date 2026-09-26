@@ -1,5 +1,12 @@
 import Foundation
 
+public protocol RoutePlanning: Sendable {
+  func plan(
+    configuration: RouteBarConfiguration,
+    forcedProfileID: String?
+  ) throws -> RoutePlan
+}
+
 public struct RoutePlan: Sendable, Equatable {
   public let profile: Profile
   public let network: NetworkSnapshot
@@ -50,7 +57,7 @@ public struct RoutePlanningError: LocalizedError, Equatable {
   public var errorDescription: String? { message }
 }
 
-public struct RoutePlanner {
+public struct RoutePlanner: RoutePlanning {
   private let discovery: NetworkDiscovering
   private let resolver: DNSResolving
 

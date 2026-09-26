@@ -23,8 +23,8 @@ bash -n .bumpster/hooks/pre-bump
 script/check-release-tools
 plutil -lint Support/io.github.phoenixweiss.routebar.plist >/dev/null
 plutil -lint Support/io.github.phoenixweiss.routebar.bundled.plist >/dev/null
+plutil -lint Support/io.github.phoenixweiss.routebar.login.plist >/dev/null
 plutil -lint Support/RouteBarApp-Info.plist >/dev/null
-plutil -lint Support/io.github.phoenixweiss.routebar.menu.plist >/dev/null
 test -s Support/RouteBar.icns
 test -s Support/Fonts/Manrope-Variable.ttf
 test -s Support/Fonts/OFL.txt

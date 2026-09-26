@@ -38,6 +38,11 @@ if [ -e "$app_path" ]; then
   fi
 fi
 
+installed_bundled_agent="$app_path/Contents/Library/LaunchAgents/io.github.phoenixweiss.routebar.login.plist"
+if [ -f "$installed_bundled_agent" ]; then
+  "$executable_path" --unregister-login-item
+fi
+
 if launchctl print "gui/$uid/$legacy_label" >/dev/null 2>&1; then
   launchctl bootout "gui/$uid/$legacy_label"
 fi

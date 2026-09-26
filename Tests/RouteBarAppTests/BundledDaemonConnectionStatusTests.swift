@@ -64,7 +64,8 @@ final class BundledDaemonConnectionStatusTests: XCTestCase {
         .status(
           RouteBarDaemonStatus(
             helperVersion: "1.2.3",
-            configuredProfileID: nil
+            configuredProfileID: "work",
+            automaticReconciliationEnabled: true
           )
         ),
       ]
@@ -78,7 +79,8 @@ final class BundledDaemonConnectionStatusTests: XCTestCase {
       report,
       BundledDaemonReadOnlyReport(
         helperVersion: "1.2.3",
-        configuredProfileID: nil
+        configuredProfileID: "work",
+        automaticReconciliationEnabled: true
       )
     )
     XCTAssertEqual(requests.count, 2)

@@ -7,7 +7,7 @@ public struct DNSResolutionError: LocalizedError, Equatable {
   public var errorDescription: String? { message }
 }
 
-public protocol DNSResolving {
+public protocol DNSResolving: Sendable {
   func resolveIPv4(hostname: String) throws -> [String]
 }
 
