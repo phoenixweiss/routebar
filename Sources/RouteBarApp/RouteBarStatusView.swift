@@ -13,6 +13,7 @@ struct RouteBarStatusView: View {
       statusHeader
       Divider()
       content
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
       Divider()
       footer
     }
@@ -111,9 +112,27 @@ struct RouteBarStatusView: View {
       .padding(30)
       .background(Color(nsColor: .textBackgroundColor))
 
+    case .selectingProfile(let selection):
+      ScrollView {
+        VStack(alignment: .leading, spacing: 0) {
+          firstRunSection
+          sectionDivider
+          daemonSection(selection.daemon)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 30)
+        .padding(.top, 22)
+        .padding(.bottom, 24)
+      }
+      .background(Color(nsColor: .textBackgroundColor))
+
     case .ready(let snapshot, _):
       ScrollView {
         VStack(alignment: .leading, spacing: 0) {
+          if shouldShowFirstRunGuidance(for: snapshot.daemon) {
+            firstRunSection
+            sectionDivider
+          }
           networkSection(snapshot)
           sectionDivider
           routesSection(snapshot)
@@ -129,13 +148,19 @@ struct RouteBarStatusView: View {
 
     case .failed(let failure):
       ScrollView {
-        VStack(alignment: .leading, spacing: 20) {
-          sectionTitle("STATUS")
-          Text(failure.message)
-            .font(routeBarFont(15.5))
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-          sectionDivider
+        VStack(alignment: .leading, spacing: 0) {
+          if isUnknownDaemonInstallation {
+            firstRunSection
+            sectionDivider
+          } else {
+            sectionTitle("STATUS")
+            Text(failure.message)
+              .font(routeBarFont(15.5))
+              .foregroundStyle(.secondary)
+              .fixedSize(horizontal: false, vertical: true)
+              .padding(.top, 20)
+            sectionDivider
+          }
           daemonSection(failure.daemon)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -254,6 +279,32 @@ struct RouteBarStatusView: View {
         }
       }
       .padding(.vertical, 8)
+
+      rowDivider
+
+      ViewThatFits(in: .horizontal) {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+          Text("Built-in service")
+            .font(routeBarFont(15.5))
+          Spacer(minLength: 16)
+          bundledDaemonValue
+        }
+
+        VStack(alignment: .leading, spacing: 7) {
+          Text("Built-in service")
+            .font(routeBarFont(15.5))
+          bundledDaemonValue
+        }
+      }
+      .padding(.vertical, 8)
+
+      if let guidance = bundledDaemonGuidance(for: daemon) {
+        Text(guidance)
+          .font(routeBarFont(13.5))
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+          .padding(.top, 3)
+      }
     }
   }
 
@@ -268,6 +319,84 @@ struct RouteBarStatusView: View {
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
     }
+  }
+
+  private var bundledDaemonValue: some View {
+    HStack(spacing: 8) {
+      Circle()
+        .fill(bundledDaemonColor)
+        .frame(width: 9, height: 9)
+        .accessibilityHidden(true)
+      Text(bundledDaemonDescription)
+        .font(routeBarFont(14))
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+  }
+
+  private var firstRunSection: some View {
+    HStack(alignment: .top, spacing: 12) {
+      Image(systemName: preflightSymbol)
+        .font(.system(size: 17, weight: .medium))
+        .foregroundStyle(preflightColor)
+        .frame(width: 22)
+        .accessibilityHidden(true)
+
+      VStack(alignment: .leading, spacing: 5) {
+        Text(firstRunTitle)
+          .font(routeBarFont(15.5, weight: .semibold))
+        Text(firstRunDetail)
+          .font(routeBarFont(13.5))
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+
+        if !model.profileOptions.isEmpty {
+          profileSelectionControl
+            .padding(.top, 8)
+        }
+      }
+    }
+  }
+
+  private var profileSelectionControl: some View {
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: 16) {
+        Text("Profile")
+          .font(routeBarFont(14.5, weight: .medium))
+        Spacer(minLength: 16)
+        profilePicker
+      }
+
+      VStack(alignment: .leading, spacing: 7) {
+        Text("Profile")
+          .font(routeBarFont(14.5, weight: .medium))
+        profilePicker
+      }
+    }
+  }
+
+  private var profilePicker: some View {
+    Picker("Profile", selection: profileSelectionBinding) {
+      if model.selectedProfileID == nil {
+        Text("Choose a profile").tag("")
+      }
+      ForEach(model.profileOptions) { profile in
+        Text(profile.name == profile.id ? profile.name : "\(profile.name) · \(profile.id)")
+          .tag(profile.id)
+      }
+    }
+    .labelsHidden()
+    .pickerStyle(.menu)
+    .controlSize(.large)
+    .disabled(model.isRefreshing)
+    .frame(maxWidth: 250, alignment: .trailing)
+  }
+
+  private var profileSelectionBinding: Binding<String> {
+    Binding(
+      get: { model.selectedProfileID ?? "" },
+      set: { model.selectProfile($0) }
+    )
   }
 
   private var footer: some View {
@@ -323,6 +452,7 @@ struct RouteBarStatusView: View {
   private var statusSymbol: String {
     switch model.state {
     case .loading: "arrow.clockwise"
+    case .selectingProfile: "list.bullet.rectangle"
     case .ready(let snapshot, _): isHealthy(snapshot) ? "checkmark" : "exclamationmark"
     case .failed: "xmark"
     }
@@ -331,23 +461,33 @@ struct RouteBarStatusView: View {
   private var statusColor: Color {
     switch model.state {
     case .loading: .secondary
+    case .selectingProfile: .orange
     case .ready(let snapshot, _): isHealthy(snapshot) ? .green : .orange
     case .failed: .red
     }
   }
 
   private var statusTitle: String {
-    switch model.state {
+    if isUnknownDaemonInstallation {
+      return "Setup blocked"
+    }
+    return switch model.state {
     case .loading: "Checking RouteBar"
+    case .selectingProfile: "Choose a profile"
     case .ready(let snapshot, _): isHealthy(snapshot) ? "Routes are active" : "Needs attention"
     case .failed: "Status unavailable"
     }
   }
 
   private var statusSummary: String {
+    if isUnknownDaemonInstallation {
+      return "The installed daemon is not recognized"
+    }
     switch model.state {
     case .loading:
       return "Reading the current gateway and explicit routes"
+    case .selectingProfile:
+      return "Select a profile to build a read-only route plan"
     case .ready(let snapshot, _):
       if isHealthy(snapshot) {
         return "\(snapshot.activeCount) routes use the physical gateway"
@@ -363,6 +503,8 @@ struct RouteBarStatusView: View {
     switch model.state {
     case .loading:
       return "Updating…"
+    case .selectingProfile(let selection):
+      return updateDescription(selection.checkedAt)
     case .ready(let snapshot, _):
       return updateDescription(snapshot.checkedAt)
     case .failed(let failure):
@@ -375,6 +517,8 @@ struct RouteBarStatusView: View {
     switch model.state {
     case .loading:
       date = nil
+    case .selectingProfile(let selection):
+      date = selection.checkedAt
     case .ready(let snapshot, _):
       date = snapshot.checkedAt
     case .failed(let failure):
@@ -442,6 +586,14 @@ struct RouteBarStatusView: View {
       && snapshot.daemon.installed
       && snapshot.daemon.loaded
       && snapshot.daemon.lastExitCode == 0
+      && !bundledDaemonNeedsAttention
+  }
+
+  private var bundledDaemonNeedsAttention: Bool {
+    switch model.bundledDaemonConnectionStatus {
+    case .versionMismatch, .unavailable: true
+    case .notApplicable, .connected: false
+    }
   }
 
   private func updateDescription(_ checkedAt: Date) -> String {
@@ -476,5 +628,183 @@ struct RouteBarStatusView: View {
 
   private func daemonColor(_ daemon: DaemonRuntimeStatus) -> Color {
     daemon.installed && daemon.loaded && daemon.lastExitCode == 0 ? .green : .orange
+  }
+
+  private var bundledDaemonDescription: String {
+    if isUnknownDaemonInstallation {
+      return "Blocked by unknown service"
+    }
+    if isLegacyDaemonInstallation {
+      return "Migration required"
+    }
+
+    return switch model.bundledDaemonStatus {
+    case .checking: "Checking…"
+    case .notRegistered: "Not enabled"
+    case .enabled:
+      switch model.bundledDaemonConnectionStatus {
+      case .connected(let helperVersion): "Connected · v\(helperVersion)"
+      case .versionMismatch: "Version mismatch"
+      case .unavailable: "Enabled, not responding"
+      case .notApplicable: "Enabled"
+      }
+    case .requiresApproval: "Approval required"
+    case .notFound: "Not included"
+    case .unknown: "Status unavailable"
+    }
+  }
+
+  private func bundledDaemonGuidance(for daemon: DaemonRuntimeStatus) -> String? {
+    if isUnknownDaemonInstallation {
+      return "Built-in setup is blocked because the installed service could not be recognized."
+    }
+    if isLegacyDaemonInstallation {
+      return
+        "The legacy service remains active. Built-in setup is blocked until it can be migrated safely."
+    }
+
+    return switch model.bundledDaemonStatus {
+    case .notRegistered:
+      daemon.installed
+        ? "The current daemon remains active; built-in setup has not been enabled."
+        : nil
+    case .requiresApproval:
+      "macOS is waiting for approval in Login Items."
+    case .notFound:
+      "This build does not include the bundled routing service."
+    case .unknown:
+      "The built-in service state could not be read."
+    case .enabled:
+      switch model.bundledDaemonConnectionStatus {
+      case .versionMismatch(let appVersion, let helperVersion):
+        "The app is v\(appVersion), but the built-in service is v\(helperVersion). No changes will be applied until they match."
+      case .unavailable:
+        "macOS reports the built-in service as enabled, but RouteBar could not reach it."
+      case .notApplicable, .connected:
+        nil
+      }
+    case .checking:
+      nil
+    }
+  }
+
+  private var bundledDaemonColor: Color {
+    if isUnknownDaemonInstallation {
+      return .red
+    }
+    if isLegacyDaemonInstallation {
+      return .orange
+    }
+
+    return switch model.bundledDaemonStatus {
+    case .enabled:
+      switch model.bundledDaemonConnectionStatus {
+      case .connected: .green
+      case .versionMismatch: .orange
+      case .unavailable: .red
+      case .notApplicable: .secondary
+      }
+    case .notRegistered, .requiresApproval: .orange
+    case .checking, .notFound, .unknown: .secondary
+    }
+  }
+
+  private func shouldShowFirstRunGuidance(for daemon: DaemonRuntimeStatus) -> Bool {
+    if isLegacyDaemonInstallation || isUnknownDaemonInstallation {
+      return true
+    }
+    if model.bundledDaemonStatus == .enabled {
+      switch model.bundledDaemonConnectionStatus {
+      case .versionMismatch, .unavailable:
+        return true
+      case .notApplicable, .connected:
+        return false
+      }
+    }
+    guard !daemon.installed else { return false }
+    return model.bundledDaemonStatus == .notRegistered
+      || model.bundledDaemonStatus == .requiresApproval
+  }
+
+  private var firstRunTitle: String {
+    if isUnknownDaemonInstallation {
+      return "Unrecognized daemon installation"
+    }
+    if isLegacyDaemonInstallation {
+      return "Legacy service is still active"
+    }
+    if case .selectingProfile = model.state {
+      return "Choose a routing profile"
+    }
+    if model.bundledDaemonStatus == .enabled {
+      switch model.bundledDaemonConnectionStatus {
+      case .versionMismatch:
+        return "Built-in service version mismatch"
+      case .unavailable:
+        return "Built-in service is not responding"
+      case .notApplicable, .connected:
+        break
+      }
+    }
+    return model.bundledDaemonStatus == .requiresApproval
+      ? "Automatic routing needs approval" : "Automatic routing is not enabled"
+  }
+
+  private var firstRunDetail: String {
+    if isUnknownDaemonInstallation {
+      return
+        "RouteBar cannot safely distinguish the installed service. Built-in setup is blocked and nothing has been changed."
+    }
+    if isLegacyDaemonInstallation {
+      return
+        "Your current automatic routing keeps running. RouteBar will not enable the built-in service until a safe migration is explicitly started."
+    }
+    if case .selectingProfile = model.state {
+      return
+        "The configuration is valid. Your selection stays in this app and only builds a read-only plan."
+    }
+    if model.bundledDaemonStatus == .enabled {
+      switch model.bundledDaemonConnectionStatus {
+      case .versionMismatch(let appVersion, let helperVersion):
+        return
+          "The app is v\(appVersion), but the built-in service is v\(helperVersion). RouteBar will not apply changes until they match."
+      case .unavailable:
+        return
+          "macOS reports the service as enabled, but RouteBar could not reach it. No changes were applied."
+      case .notApplicable, .connected:
+        break
+      }
+    }
+    if model.bundledDaemonStatus == .requiresApproval {
+      return
+        "Approve RouteBar in System Settings > General > Login Items before setup can continue."
+    }
+    return
+      "The configuration and route plan are available. Enabling the built-in service will require administrator approval."
+  }
+
+  private var preflightSymbol: String {
+    if isUnknownDaemonInstallation {
+      return "exclamationmark.octagon"
+    }
+    if isLegacyDaemonInstallation {
+      return "arrow.triangle.2.circlepath"
+    }
+    return "gearshape"
+  }
+
+  private var preflightColor: Color {
+    isUnknownDaemonInstallation ? .red : bundledDaemonColor
+  }
+
+  private var isLegacyDaemonInstallation: Bool {
+    if case .legacy = model.installedDaemon {
+      return true
+    }
+    return false
+  }
+
+  private var isUnknownDaemonInstallation: Bool {
+    model.installedDaemon == .unknown
   }
 }

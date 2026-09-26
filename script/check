@@ -12,6 +12,7 @@ sh -n script/install-daemon
 sh -n script/uninstall-daemon
 sh -n script/install-app
 sh -n script/build-app
+sh -n script/verify-app-bundle
 sh -n script/build-app-icon
 sh -n script/changelog-release-notes
 sh -n script/package-release
@@ -21,6 +22,7 @@ sh -n script/prepare-release-changelog
 bash -n .bumpster/hooks/pre-bump
 script/check-release-tools
 plutil -lint Support/io.github.phoenixweiss.routebar.plist >/dev/null
+plutil -lint Support/io.github.phoenixweiss.routebar.bundled.plist >/dev/null
 plutil -lint Support/RouteBarApp-Info.plist >/dev/null
 plutil -lint Support/io.github.phoenixweiss.routebar.menu.plist >/dev/null
 test -s Support/RouteBar.icns
@@ -34,3 +36,11 @@ test "$(plutil -extract ATSApplicationFontsPath raw -o - Support/RouteBarApp-Inf
 grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' VERSION
 grep -Fqx '## [Unreleased]' CHANGELOG.md
 git diff --check
+
+temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/routebar-check.XXXXXX")
+cleanup_temporary_files() {
+  rm -rf "$temporary_dir" 2>/dev/null || true
+}
+trap cleanup_temporary_files EXIT
+trap 'exit 1' HUP INT TERM
+script/build-app "$temporary_dir/RouteBar.app"

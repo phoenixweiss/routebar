@@ -81,37 +81,109 @@ public struct InstalledDaemonConfiguration: Sendable, Equatable {
   }
 }
 
+public enum InstalledDaemonInstallation: Sendable, Equatable {
+  case notInstalled
+  case legacy(InstalledDaemonConfiguration)
+  case bundled
+  case unknown
+}
+
+public protocol InstalledDaemonInspecting: Sendable {
+  func inspect() -> InstalledDaemonInstallation
+}
+
+public struct SystemInstalledDaemonInspector: InstalledDaemonInspecting {
+  public static let legacyBinaryPath =
+    "/Library/PrivilegedHelperTools/io.github.phoenixweiss.routebar"
+  public static let bundledProgram = "Contents/Resources/routebar-daemon"
+
+  private let plistURL: URL
+
+  public init(plistURL: URL = SystemDaemonRuntimeInspector.plistURL) {
+    self.plistURL = plistURL
+  }
+
+  public func inspect() -> InstalledDaemonInstallation {
+    Self.inspect(plistAt: plistURL)
+  }
+
+  public static func inspect(plistAt url: URL) -> InstalledDaemonInstallation {
+    guard FileManager.default.fileExists(atPath: url.path) else { return .notInstalled }
+    guard
+      let data = try? Data(contentsOf: url),
+      let propertyList = try? PropertyListSerialization.propertyList(
+        from: data,
+        options: [],
+        format: nil
+      ),
+      let plist = propertyList as? [String: Any],
+      plist["Label"] as? String == SystemDaemonRuntimeInspector.label
+    else {
+      return .unknown
+    }
+
+    let rawProgramArguments = plist["ProgramArguments"]
+    let programArguments = rawProgramArguments as? [String]
+    let bundleProgram = plist["BundleProgram"] as? String
+    let machServices = plist["MachServices"] as? [String: Any]
+
+    if rawProgramArguments == nil,
+      plist["Program"] == nil,
+      bundleProgram == bundledProgram,
+      machServices?.count == 1,
+      machServices?[SystemDaemonRuntimeInspector.label] as? Bool == true
+    {
+      return .bundled
+    }
+
+    guard plist["Program"] == nil,
+      plist["BundleProgram"] == nil,
+      plist["MachServices"] == nil,
+      let programArguments,
+      programArguments.count == 8,
+      programArguments[0] == legacyBinaryPath,
+      programArguments[1] == "reconcile",
+      programArguments[2] == "--apply",
+      programArguments[3] == "--quiet",
+      programArguments[4] == "--config",
+      programArguments[6] == "--profile",
+      programArguments[5].hasPrefix("/"),
+      !programArguments[7].isEmpty
+    else {
+      return .unknown
+    }
+
+    return .legacy(
+      InstalledDaemonConfiguration(
+        configURL: URL(fileURLWithPath: programArguments[5]),
+        profileID: programArguments[7]
+      )
+    )
+  }
+}
+
 public enum InstalledDaemonConfigurationLoader {
   public static func load(
     from url: URL = SystemDaemonRuntimeInspector.plistURL
   ) throws -> InstalledDaemonConfiguration? {
-    guard FileManager.default.fileExists(atPath: url.path) else { return nil }
-    let data = try Data(contentsOf: url)
-    let plist = try PropertyListDecoder().decode(LaunchDaemonPlist.self, from: data)
-    guard
-      let configPath = value(after: "--config", in: plist.programArguments),
-      let profileID = value(after: "--profile", in: plist.programArguments)
-    else {
-      return nil
+    switch SystemInstalledDaemonInspector.inspect(plistAt: url) {
+    case .legacy(let configuration):
+      configuration
+    case .notInstalled, .bundled:
+      nil
+    case .unknown:
+      throw InstalledDaemonInspectionError.unrecognizedConfiguration
     }
-    return InstalledDaemonConfiguration(
-      configURL: URL(fileURLWithPath: configPath),
-      profileID: profileID
-    )
-  }
-
-  private static func value(after flag: String, in arguments: [String]) -> String? {
-    guard let index = arguments.firstIndex(of: flag) else { return nil }
-    let valueIndex = arguments.index(after: index)
-    guard valueIndex < arguments.endIndex else { return nil }
-    return arguments[valueIndex]
   }
 }
 
-private struct LaunchDaemonPlist: Decodable {
-  let programArguments: [String]
+public enum InstalledDaemonInspectionError: LocalizedError {
+  case unrecognizedConfiguration
 
-  private enum CodingKeys: String, CodingKey {
-    case programArguments = "ProgramArguments"
+  public var errorDescription: String? {
+    switch self {
+    case .unrecognizedConfiguration:
+      "RouteBar found an unrecognized launch daemon configuration. Built-in setup is blocked and no changes were made."
+    }
   }
 }

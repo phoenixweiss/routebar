@@ -97,8 +97,9 @@ struct RouteBarMenuView: View {
   }
 
   private var statusSymbol: String {
-    switch model.state {
+    return switch model.state {
     case .loading: "arrow.triangle.2.circlepath"
+    case .selectingProfile: "list.bullet.rectangle"
     case .ready(let snapshot, _):
       isHealthy(snapshot) ? "checkmark.shield.fill" : "exclamationmark.triangle.fill"
     case .failed: "xmark.octagon.fill"
@@ -106,25 +107,35 @@ struct RouteBarMenuView: View {
   }
 
   private var statusColor: Color {
-    switch model.state {
+    return switch model.state {
     case .loading: .secondary
+    case .selectingProfile: .orange
     case .ready(let snapshot, _): isHealthy(snapshot) ? .green : .orange
     case .failed: .red
     }
   }
 
   private var statusTitle: String {
-    switch model.state {
+    if model.installedDaemon == .unknown {
+      return "Setup blocked"
+    }
+    return switch model.state {
     case .loading: "Checking RouteBar"
+    case .selectingProfile: "Choose a profile"
     case .ready(let snapshot, _): isHealthy(snapshot) ? "Routes are active" : "Needs attention"
     case .failed: "Status unavailable"
     }
   }
 
   private var statusSummary: String {
+    if model.installedDaemon == .unknown {
+      return "The installed daemon configuration is not recognized"
+    }
     switch model.state {
     case .loading:
       return "Reading the current gateway and explicit routes"
+    case .selectingProfile:
+      return "Open RouteBar to build a read-only route plan"
     case .ready(let snapshot, _):
       if isHealthy(snapshot) {
         return "\(snapshot.activeCount) routes use the physical gateway"
@@ -141,5 +152,13 @@ struct RouteBarMenuView: View {
       && snapshot.daemon.installed
       && snapshot.daemon.loaded
       && snapshot.daemon.lastExitCode == 0
+      && !bundledDaemonNeedsAttention
+  }
+
+  private var bundledDaemonNeedsAttention: Bool {
+    switch model.bundledDaemonConnectionStatus {
+    case .versionMismatch, .unavailable: true
+    case .notApplicable, .connected: false
+    }
   }
 }

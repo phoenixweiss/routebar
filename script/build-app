@@ -27,6 +27,7 @@ if ! printf '%s\n' "$version" | grep -Eq \
 fi
 
 swift build --package-path "$project_dir" -c release --product routebar-app
+swift build --package-path "$project_dir" -c release --product routebar-daemon
 
 temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/routebar-app-build.XXXXXX")
 temporary_app="$temporary_dir/RouteBar.app"
@@ -36,7 +37,10 @@ cleanup_temporary_files() {
 trap cleanup_temporary_files EXIT
 trap 'exit 1' HUP INT TERM
 
-mkdir -p "$temporary_app/Contents/MacOS" "$temporary_app/Contents/Resources/Fonts"
+mkdir -p \
+  "$temporary_app/Contents/MacOS" \
+  "$temporary_app/Contents/Resources/Fonts" \
+  "$temporary_app/Contents/Library/LaunchDaemons"
 cp "$project_dir/Support/RouteBarApp-Info.plist" "$temporary_app/Contents/Info.plist"
 plutil -replace CFBundleShortVersionString -string "$version" \
   "$temporary_app/Contents/Info.plist"
@@ -44,6 +48,12 @@ plutil -replace CFBundleVersion -string "$version" \
   "$temporary_app/Contents/Info.plist"
 install -m 0755 "$project_dir/.build/release/routebar-app" \
   "$temporary_app/Contents/MacOS/routebar-app"
+install -m 0755 "$project_dir/.build/release/routebar-daemon" \
+  "$temporary_app/Contents/Resources/routebar-daemon"
+install -m 0644 "$project_dir/Support/io.github.phoenixweiss.routebar.bundled.plist" \
+  "$temporary_app/Contents/Library/LaunchDaemons/io.github.phoenixweiss.routebar.plist"
+plutil -replace EnvironmentVariables.ROUTEBAR_HELPER_VERSION -string "$version" \
+  "$temporary_app/Contents/Library/LaunchDaemons/io.github.phoenixweiss.routebar.plist"
 install -m 0644 "$project_dir/Support/RouteBar.icns" \
   "$temporary_app/Contents/Resources/RouteBar.icns"
 install -m 0644 "$project_dir/Support/Fonts/Manrope-Variable.ttf" \
@@ -56,8 +66,9 @@ install -m 0644 "$project_dir/LICENSE" \
   "$temporary_app/Contents/Resources/LICENSE"
 
 plutil -lint "$temporary_app/Contents/Info.plist" >/dev/null
-codesign --force --deep --sign - "$temporary_app" >/dev/null
-codesign --verify --deep --strict --verbose=4 "$temporary_app"
+codesign --force --sign - "$temporary_app/Contents/Resources/routebar-daemon" >/dev/null
+codesign --force --sign - "$temporary_app" >/dev/null
+"$project_dir/script/verify-app-bundle" "$temporary_app"
 
 mkdir -p "$(dirname "$output_app")"
 mv "$temporary_app" "$output_app"

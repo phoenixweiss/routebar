@@ -9,8 +9,10 @@ let package = Package(
   ],
   products: [
     .library(name: "RouteBarCore", targets: ["RouteBarCore"]),
+    .library(name: "RouteBarDaemonIPC", targets: ["RouteBarDaemonIPC"]),
     .executable(name: "routebar", targets: ["RouteBarCLI"]),
     .executable(name: "routebar-app", targets: ["RouteBarApp"]),
+    .executable(name: "routebar-daemon", targets: ["RouteBarDaemon"]),
   ],
   dependencies: [
     .package(url: "https://github.com/jpsim/Yams.git", from: "6.2.2")
@@ -31,15 +33,34 @@ let package = Package(
     ),
     .executableTarget(
       name: "RouteBarApp",
-      dependencies: ["RouteBarCore"],
+      dependencies: ["RouteBarCore", "RouteBarDaemonIPC"],
       linkerSettings: [
         .linkedFramework("AppKit"),
+        .linkedFramework("ServiceManagement"),
         .linkedFramework("SwiftUI"),
       ]
+    ),
+    .target(
+      name: "RouteBarDaemonIPC",
+      linkerSettings: [
+        .linkedFramework("Security")
+      ]
+    ),
+    .executableTarget(
+      name: "RouteBarDaemon",
+      dependencies: ["RouteBarDaemonIPC"]
     ),
     .testTarget(
       name: "RouteBarCoreTests",
       dependencies: ["RouteBarCore"]
+    ),
+    .testTarget(
+      name: "RouteBarDaemonIPCTests",
+      dependencies: ["RouteBarDaemonIPC"]
+    ),
+    .testTarget(
+      name: "RouteBarAppTests",
+      dependencies: ["RouteBarApp", "RouteBarDaemonIPC"]
     ),
   ]
 )

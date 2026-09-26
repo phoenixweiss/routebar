@@ -45,14 +45,7 @@ mkdir -p "$staging_dir"
 "$project_dir/script/build-app" "$staging_dir/RouteBar.app"
 ln -s /Applications "$staging_dir/Applications"
 
-bundle_version=$(plutil -extract CFBundleShortVersionString raw -o - \
-  "$staging_dir/RouteBar.app/Contents/Info.plist")
-if [ "$bundle_version" != "$version" ]; then
-  echo "Application bundle version does not match VERSION." >&2
-  exit 1
-fi
-file "$staging_dir/RouteBar.app/Contents/MacOS/routebar-app" | grep -q "$architecture"
-codesign --verify --deep --strict --verbose=4 "$staging_dir/RouteBar.app"
+"$project_dir/script/verify-app-bundle" "$staging_dir/RouteBar.app" "$architecture"
 
 hdiutil create \
   -volname "RouteBar $version" \

@@ -80,10 +80,7 @@ jobs:
           app="$mount_dir/RouteBar.app"
           test -L "$mount_dir/Applications"
           test "$(readlink "$mount_dir/Applications")" = '/Applications'
-          test "$(plutil -extract CFBundleShortVersionString raw -o - "$app/Contents/Info.plist")" = "$version"
-          test "$(plutil -extract CFBundleIdentifier raw -o - "$app/Contents/Info.plist")" = 'io.github.phoenixweiss.routebar.menu'
-          file "$app/Contents/MacOS/routebar-app" | grep -q 'arm64'
-          codesign --verify --deep --strict --verbose=4 "$app"
+          script/verify-app-bundle "$app" arm64
 
       - name: Upload a verified draft release
         shell: bash
