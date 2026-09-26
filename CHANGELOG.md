@@ -8,6 +8,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-09-26
+
 ### Fixed
 
 - Background reopen requests and status refreshes no longer activate RouteBar
@@ -70,7 +72,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Privileged route state is restricted to a fixed root-owned path instead of a
   caller-selected location.
 
-[Unreleased]: https://github.com/phoenixweiss/routebar/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/phoenixweiss/routebar/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/phoenixweiss/routebar/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/phoenixweiss/routebar/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/phoenixweiss/routebar/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/phoenixweiss/routebar/compare/v0.1.1...v0.1.2
