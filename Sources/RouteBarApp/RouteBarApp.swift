@@ -35,8 +35,9 @@ final class RouteBarAppDelegate: NSObject, NSApplicationDelegate {
     _ sender: NSApplication,
     hasVisibleWindows flag: Bool
   ) -> Bool {
-    RouteBarApplicationController.shared.showStatusWindow()
-    return true
+    guard sender.isActive, !flag else { return false }
+    RouteBarApplicationController.shared.showStatusWindow(activateApplication: false)
+    return false
   }
 }
 
@@ -47,7 +48,7 @@ final class RouteBarApplicationController: NSObject, NSWindowDelegate {
   let model = RouteBarAppModel()
   private var statusWindowController: NSWindowController?
 
-  func showStatusWindow() {
+  func showStatusWindow(activateApplication: Bool = true) {
     if statusWindowController == nil {
       let content = RouteBarStatusView(model: model)
       let window = NSWindow(
@@ -68,7 +69,9 @@ final class RouteBarApplicationController: NSObject, NSWindowDelegate {
     }
 
     applyDockVisibility()
-    NSApplication.shared.activate(ignoringOtherApps: true)
+    if activateApplication {
+      NSApplication.shared.activate(ignoringOtherApps: true)
+    }
     statusWindowController?.showWindow(nil)
     statusWindowController?.window?.makeKeyAndOrderFront(nil)
     Task { await model.refresh() }

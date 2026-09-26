@@ -8,6 +8,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- Background reopen requests and status refreshes no longer activate RouteBar
+  or move its main window over the current Space or full-screen application.
+
 ## [0.2.1] - 2026-09-26
 
 ### Fixed
