@@ -219,9 +219,9 @@ struct RouteBarDiagnostics: Equatable {
     _ diagnostics: BundledDaemonReconciliationDiagnostics
   ) -> String {
     switch diagnostics.configurationRequiresReload {
-    case true: "Changed, awaiting confirmation"
-    case false: "Current"
-    case nil: "Not reported"
+    case .some(true): "Changed, awaiting confirmation"
+    case .some(false): "Current"
+    case .none: "Not reported"
     }
   }
 
