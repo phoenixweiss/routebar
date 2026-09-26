@@ -16,7 +16,7 @@ replace or reconfigure the system default route.
 ## Download
 
 The current release is
-[RouteBar 0.2.4](https://github.com/phoenixweiss/routebar/releases/tag/v0.2.4) for
+[RouteBar 0.2.5](https://github.com/phoenixweiss/routebar/releases/tag/v0.2.5) for
 Apple silicon Macs running macOS 13 or later. Download the DMG, open it, and copy
 RouteBar to Applications.
 

@@ -16,7 +16,7 @@ RouteBar не является VPN-клиентом и не заменяет и 
 ## Скачать
 
 Текущий выпуск —
-[RouteBar 0.2.4](https://github.com/phoenixweiss/routebar/releases/tag/v0.2.4) для
+[RouteBar 0.2.5](https://github.com/phoenixweiss/routebar/releases/tag/v0.2.5) для
 Mac с Apple silicon под управлением macOS 13 или новее. Скачайте DMG, откройте
 его и скопируйте RouteBar в «Программы».
 
