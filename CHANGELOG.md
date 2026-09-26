@@ -8,6 +8,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-09-26
+
 ### Added
 
 - A tag-driven macOS release workflow now builds and verifies an Apple silicon
@@ -92,7 +94,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Privileged route state is restricted to a fixed root-owned path instead of a
   caller-selected location.
 
-[Unreleased]: https://github.com/phoenixweiss/routebar/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/phoenixweiss/routebar/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/phoenixweiss/routebar/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/phoenixweiss/routebar/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/phoenixweiss/routebar/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/phoenixweiss/routebar/compare/v0.2.0...v0.2.1
