@@ -137,6 +137,12 @@ struct RouteBarMenuView: View {
     case .selectingProfile:
       return "Open RouteBar to build a read-only route plan"
     case .ready(let snapshot, _):
+      if model.reconciliationDiagnostics.configurationRequiresReload == true {
+        return "Configuration changed and is waiting to be applied"
+      }
+      if model.reconciliationDiagnostics.lastError != nil {
+        return "The last automatic reconciliation failed"
+      }
       if isHealthy(snapshot) {
         return "\(snapshot.activeCount) routes use the physical gateway"
       }
@@ -156,7 +162,15 @@ struct RouteBarMenuView: View {
   }
 
   private var bundledDaemonNeedsAttention: Bool {
-    switch model.bundledDaemonConnectionStatus {
+    if case .legacy = model.installedDaemon {
+      return false
+    }
+    if model.reconciliationDiagnostics.lastError != nil
+      || model.reconciliationDiagnostics.configurationRequiresReload == true
+    {
+      return true
+    }
+    return switch model.bundledDaemonConnectionStatus {
     case .versionMismatch, .unavailable: true
     case .notApplicable, .connected: false
     }

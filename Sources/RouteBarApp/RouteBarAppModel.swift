@@ -98,6 +98,8 @@ final class RouteBarAppModel: ObservableObject {
     .idle
   @Published private(set) var configuredProfileID: String? = nil
   @Published private(set) var automaticReconciliationEnabled = false
+  @Published private(set) var reconciliationDiagnostics: BundledDaemonReconciliationDiagnostics =
+    .unknown
   @Published private(set) var bundledDaemonReconciliationState: BundledDaemonReconciliationState =
     .idle
   @Published private(set) var configurationReloadState: BundledDaemonConfigurationReloadState =
@@ -168,6 +170,7 @@ final class RouteBarAppModel: ObservableObject {
       configuredProfileID: String? = nil,
       bundledDaemonConfigurationResult: Result<String, Error>? = nil,
       automaticReconciliationEnabled: Bool = false,
+      reconciliationDiagnostics: BundledDaemonReconciliationDiagnostics = .unknown,
       bundledDaemonReconciliationResult: Result<RouteBarDaemonOperationResult, Error>? = nil,
       bundledDaemonCleanupResult: Result<RouteBarDaemonOperationResult, Error>? = nil,
       configurationReloadState: BundledDaemonConfigurationReloadState = .idle,
@@ -230,6 +233,7 @@ final class RouteBarAppModel: ObservableObject {
       self.selectedProfileID = selectedProfileID
       self.configuredProfileID = configuredProfileID
       self.automaticReconciliationEnabled = automaticReconciliationEnabled
+      self.reconciliationDiagnostics = reconciliationDiagnostics
       self.configurationReloadState = configurationReloadState
       self.launchAtLoginStatus = launchAtLoginStatus
     }
@@ -282,6 +286,7 @@ final class RouteBarAppModel: ObservableObject {
     configuredProfileID = bundledDaemonReport?.configuredProfileID
     automaticReconciliationEnabled =
       bundledDaemonReport?.automaticReconciliationEnabled ?? false
+    reconciliationDiagnostics = bundledDaemonReport?.reconciliationDiagnostics ?? .unknown
     self.launchAtLoginStatus = launchAtLoginStatus
     synchronizeUpdateState(
       serviceStatus: result.bundledDaemonStatus,

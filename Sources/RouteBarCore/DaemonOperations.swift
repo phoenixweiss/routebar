@@ -16,6 +16,28 @@ public struct RouteBarDaemonOperationSummary: Sendable, Equatable {
   }
 }
 
+public struct RouteBarDaemonReconciliationDiagnostics: Sendable, Equatable {
+  public let lastAttemptAt: Date?
+  public let lastSuccessfulAt: Date?
+  public let lastResult: RouteBarDaemonOperationSummary?
+  public let lastError: String?
+  public let configurationRequiresReload: Bool?
+
+  public init(
+    lastAttemptAt: Date? = nil,
+    lastSuccessfulAt: Date? = nil,
+    lastResult: RouteBarDaemonOperationSummary? = nil,
+    lastError: String? = nil,
+    configurationRequiresReload: Bool? = nil
+  ) {
+    self.lastAttemptAt = lastAttemptAt
+    self.lastSuccessfulAt = lastSuccessfulAt
+    self.lastResult = lastResult
+    self.lastError = lastError
+    self.configurationRequiresReload = configurationRequiresReload
+  }
+}
+
 public struct RouteBarDaemonOperationError: LocalizedError, Equatable {
   public let message: String
 
@@ -51,6 +73,11 @@ public actor RouteBarDaemonOperationService {
   private let configurationService: RouteBarDaemonConfigurationService
   private let reconciliationRunner: any RouteBarRouteReconciliationRunning
   private var operationInProgress = false
+  private var lastAttemptAt: Date?
+  private var lastSuccessfulAt: Date?
+  private var lastResult: RouteBarDaemonOperationSummary?
+  private var lastError: String?
+  private var appliedConfigurationRevision: String?
 
   public init(
     configurationService: RouteBarDaemonConfigurationService,
@@ -102,9 +129,41 @@ public actor RouteBarDaemonOperationService {
     return Self.summary(result)
   }
 
+  public func diagnostics() async -> RouteBarDaemonReconciliationDiagnostics {
+    let currentRevision = try? await configurationService.currentConfigurationRevision()
+    let configurationRequiresReload = currentRevision.flatMap { currentRevision in
+      appliedConfigurationRevision.map { $0 != currentRevision }
+    }
+    return RouteBarDaemonReconciliationDiagnostics(
+      lastAttemptAt: lastAttemptAt,
+      lastSuccessfulAt: lastSuccessfulAt,
+      lastResult: lastResult,
+      lastError: lastError,
+      configurationRequiresReload: configurationRequiresReload
+    )
+  }
+
   private func reconcileConfiguredRoutes() async throws -> RouteBarDaemonOperationSummary {
-    let routePlan = try await configurationService.routePlan()
-    return Self.summary(try reconciliationRunner.apply(routePlan: routePlan))
+    let attemptedAt = Date()
+    do {
+      let snapshot = try await configurationService.routePlanSnapshot()
+      let summary = Self.summary(try reconciliationRunner.apply(routePlan: snapshot.plan))
+      lastAttemptAt = attemptedAt
+      lastResult = summary
+      if summary.conflictCount == 0 {
+        lastSuccessfulAt = attemptedAt
+        lastError = nil
+        appliedConfigurationRevision = snapshot.configurationRevision
+      } else {
+        lastError = "RouteBar found \(summary.conflictCount) route conflict(s) and stopped."
+      }
+      return summary
+    } catch {
+      lastAttemptAt = attemptedAt
+      lastResult = nil
+      lastError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+      throw error
+    }
   }
 
   private func beginOperation() throws {

@@ -26,6 +26,7 @@ final class RouteBarDaemonIPCTests: XCTestCase {
   }
 
   func testWireCodecRoundTripsEveryResponse() throws {
+    let reconciledAt = Date(timeIntervalSince1970: 1_700_000_000)
     let result = RouteBarDaemonOperationResult(
       changedRouteCount: 1,
       activeRouteCount: 2,
@@ -36,7 +37,12 @@ final class RouteBarDaemonIPCTests: XCTestCase {
       .status(
         RouteBarDaemonStatus(
           helperVersion: "1.0.0",
-          configuredProfileID: "work"
+          configuredProfileID: "work",
+          automaticReconciliationEnabled: true,
+          lastReconciliationAttemptAt: reconciledAt,
+          lastSuccessfulReconciliationAt: reconciledAt,
+          lastReconciliationResult: result,
+          configurationRequiresReload: false
         )
       ),
       .configured(profileID: "work"),

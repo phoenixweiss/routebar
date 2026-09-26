@@ -6,6 +6,19 @@ import SwiftUI
 struct RouteBarApp {
   @MainActor
   static func main() {
+    if CommandLine.arguments.contains("--register-login-item") {
+      do {
+        _ = try SystemLaunchAtLoginManager().setEnabled(true)
+        exit(EXIT_SUCCESS)
+      } catch {
+        fputs(
+          "RouteBar could not register launch at login: \(error.localizedDescription)\n",
+          stderr
+        )
+        exit(EXIT_FAILURE)
+      }
+    }
+
     if CommandLine.arguments.contains("--unregister-login-item") {
       do {
         _ = try SystemLaunchAtLoginManager().setEnabled(false)

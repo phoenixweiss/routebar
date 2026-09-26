@@ -73,12 +73,18 @@ public struct RouteBarDaemonConfiguredHandler: RouteBarDaemonRequestHandling {
       return .version(RouteBarDaemonVersion(helperVersion: helperVersion))
     case .status:
       let settings = try await configurationService.settings()
+      let diagnostics = await operationService.diagnostics()
       return .status(
         RouteBarDaemonStatus(
           helperVersion: helperVersion,
           configuredProfileID: settings?.profileID,
           automaticReconciliationEnabled:
-            settings?.automaticReconciliationEnabled ?? false
+            settings?.automaticReconciliationEnabled ?? false,
+          lastReconciliationAttemptAt: diagnostics.lastAttemptAt,
+          lastSuccessfulReconciliationAt: diagnostics.lastSuccessfulAt,
+          lastReconciliationResult: diagnostics.lastResult.map(Self.response),
+          lastError: diagnostics.lastError,
+          configurationRequiresReload: diagnostics.configurationRequiresReload
         )
       )
     case .configure(let profileID):

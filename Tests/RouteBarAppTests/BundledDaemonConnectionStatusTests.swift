@@ -58,6 +58,13 @@ final class BundledDaemonConnectionStatusTests: XCTestCase {
   }
 
   func testInspectorReadsBothVersionAndStatus() async throws {
+    let attemptedAt = Date(timeIntervalSince1970: 1_700_000_010)
+    let successfulAt = Date(timeIntervalSince1970: 1_700_000_000)
+    let result = RouteBarDaemonOperationResult(
+      changedRouteCount: 1,
+      activeRouteCount: 2,
+      conflictCount: 0
+    )
     let transport = AppFakeDaemonTransport(
       responses: [
         .version(RouteBarDaemonVersion(helperVersion: "1.2.3")),
@@ -65,7 +72,11 @@ final class BundledDaemonConnectionStatusTests: XCTestCase {
           RouteBarDaemonStatus(
             helperVersion: "1.2.3",
             configuredProfileID: "work",
-            automaticReconciliationEnabled: true
+            automaticReconciliationEnabled: true,
+            lastReconciliationAttemptAt: attemptedAt,
+            lastSuccessfulReconciliationAt: successfulAt,
+            lastReconciliationResult: result,
+            configurationRequiresReload: true
           )
         ),
       ]
@@ -80,7 +91,13 @@ final class BundledDaemonConnectionStatusTests: XCTestCase {
       BundledDaemonReadOnlyReport(
         helperVersion: "1.2.3",
         configuredProfileID: "work",
-        automaticReconciliationEnabled: true
+        automaticReconciliationEnabled: true,
+        reconciliationDiagnostics: BundledDaemonReconciliationDiagnostics(
+          lastAttemptAt: attemptedAt,
+          lastSuccessfulAt: successfulAt,
+          lastResult: result,
+          configurationRequiresReload: true
+        )
       )
     )
     XCTAssertEqual(requests.count, 2)

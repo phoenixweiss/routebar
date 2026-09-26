@@ -1,3 +1,4 @@
+import CryptoKit
 import Darwin
 import Foundation
 
@@ -176,18 +177,43 @@ public actor RouteBarDaemonConfigurationService {
   }
 
   public func routePlan() throws -> RoutePlan {
+    try routePlanSnapshot().plan
+  }
+
+  public func routePlanSnapshot() throws -> RouteBarDaemonRoutePlanSnapshot {
     guard let settings = try settingsStore.load() else {
       throw RouteBarDaemonConfigurationError(
         message: "RouteBar has not been configured"
       )
     }
-    let configuration = try ConfigurationLoader.load(
-      from: configurationURL(for: settings.ownerUID)
+    let data = try Data(contentsOf: configurationURL(for: settings.ownerUID))
+    guard let source = String(data: data, encoding: .utf8) else {
+      throw RouteBarDaemonConfigurationError(
+        message: "RouteBar configuration is not valid UTF-8"
+      )
+    }
+    let configuration = try ConfigurationLoader.load(source: source)
+    return RouteBarDaemonRoutePlanSnapshot(
+      plan: try routePlanner.plan(
+        configuration: configuration,
+        forcedProfileID: settings.profileID
+      ),
+      configurationRevision: Self.revision(for: data)
     )
-    return try routePlanner.plan(
-      configuration: configuration,
-      forcedProfileID: settings.profileID
-    )
+  }
+
+  public func currentConfigurationRevision() throws -> String {
+    guard let settings = try settingsStore.load() else {
+      throw RouteBarDaemonConfigurationError(
+        message: "RouteBar has not been configured"
+      )
+    }
+    let data = try Data(contentsOf: configurationURL(for: settings.ownerUID))
+    return Self.revision(for: data)
+  }
+
+  private static func revision(for data: Data) -> String {
+    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
   }
 
   public func requireOwner(_ clientUID: UInt32) throws -> RouteBarDaemonSettings {
@@ -217,5 +243,15 @@ public actor RouteBarDaemonConfigurationService {
         automaticReconciliationEnabled: enabled
       )
     )
+  }
+}
+
+public struct RouteBarDaemonRoutePlanSnapshot: Sendable, Equatable {
+  public let plan: RoutePlan
+  public let configurationRevision: String
+
+  public init(plan: RoutePlan, configurationRevision: String) {
+    self.plan = plan
+    self.configurationRevision = configurationRevision
   }
 }

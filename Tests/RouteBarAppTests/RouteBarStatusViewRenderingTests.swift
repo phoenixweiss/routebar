@@ -156,7 +156,8 @@ final class RouteBarStatusViewRenderingTests: XCTestCase {
             runs: 42,
             lastExitCode: 0,
             intervalSeconds: 30
-          )
+          ),
+          routesActive: true
         ),
         configURL: URL(fileURLWithPath: "/tmp/config.yaml")
       ),
@@ -201,7 +202,8 @@ final class RouteBarStatusViewRenderingTests: XCTestCase {
             runs: 42,
             lastExitCode: 0,
             intervalSeconds: 30
-          )
+          ),
+          routesActive: true
         ),
         configURL: URL(fileURLWithPath: "/tmp/config.yaml")
       ),
@@ -223,6 +225,55 @@ final class RouteBarStatusViewRenderingTests: XCTestCase {
     try assertRenders(
       RouteBarStatusView(model: model),
       outputPrefix: "routebar-rejected-configuration",
+      sizes: [
+        NSSize(width: 510, height: 660),
+        NSSize(width: 470, height: 560),
+        NSSize(width: 510, height: 900),
+      ]
+    )
+  }
+
+  @MainActor
+  func testChangedConfigurationDiagnosticsRenderAtSupportedWindowSizes() throws {
+    let checkedAt = Date(timeIntervalSince1970: 1_700_000_000)
+    let model = RouteBarAppModel(
+      previewState: .ready(
+        sampleSnapshot(
+          daemon: DaemonRuntimeStatus(
+            installed: true,
+            loaded: true,
+            runs: 42,
+            lastExitCode: 0,
+            intervalSeconds: 30
+          ),
+          routesActive: true
+        ),
+        configURL: URL(fileURLWithPath: "/tmp/config.yaml")
+      ),
+      installedDaemon: .bundled,
+      bundledDaemonStatus: .enabled,
+      bundledDaemonConnectionStatus: .connected(helperVersion: "1.2.3"),
+      profileOptions: [option(id: "sample", name: "Sample profile")],
+      selectedProfileID: "sample",
+      configuredProfileID: "sample",
+      automaticReconciliationEnabled: true,
+      reconciliationDiagnostics: BundledDaemonReconciliationDiagnostics(
+        lastAttemptAt: checkedAt,
+        lastSuccessfulAt: checkedAt,
+        lastResult: RouteBarDaemonOperationResult(
+          changedRouteCount: 0,
+          activeRouteCount: 2,
+          conflictCount: 0
+        ),
+        configurationRequiresReload: true
+      ),
+      launchAtLoginStatus: .enabled,
+      showInDock: true
+    )
+
+    try assertRenders(
+      RouteBarStatusView(model: model),
+      outputPrefix: "routebar-configuration-changed",
       sizes: [
         NSSize(width: 510, height: 660),
         NSSize(width: 470, height: 560),
@@ -344,7 +395,8 @@ final class RouteBarStatusViewRenderingTests: XCTestCase {
   }
 
   private func sampleSnapshot(
-    daemon: DaemonRuntimeStatus = DaemonRuntimeStatus(installed: false, loaded: false)
+    daemon: DaemonRuntimeStatus = DaemonRuntimeStatus(installed: false, loaded: false),
+    routesActive: Bool = false
   ) -> RouteStatusSnapshot {
     RouteStatusSnapshot(
       profile: Profile(
@@ -367,16 +419,16 @@ final class RouteBarStatusViewRenderingTests: XCTestCase {
             RouteTargetStatus(
               address: "192.0.2.10",
               sources: ["service.example"],
-              isActive: false,
-              observedGateway: nil,
-              observedInterface: nil
+              isActive: routesActive,
+              observedGateway: routesActive ? "192.0.2.1" : nil,
+              observedInterface: routesActive ? "en0" : nil
             ),
             RouteTargetStatus(
               address: "192.0.2.11",
               sources: ["service.example"],
-              isActive: false,
-              observedGateway: nil,
-              observedInterface: nil
+              isActive: routesActive,
+              observedGateway: routesActive ? "192.0.2.1" : nil,
+              observedInterface: routesActive ? "en0" : nil
             ),
           ]
         )

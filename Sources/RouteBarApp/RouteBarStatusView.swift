@@ -354,12 +354,22 @@ struct RouteBarStatusView: View {
       }
       .padding(.vertical, 8)
 
+      if shouldShowReconciliationDiagnostics {
+        rowDivider
+        reconciliationStatus
+      }
+
       if let guidance = bundledDaemonGuidance(for: daemon) {
         Text(guidance)
           .font(routeBarFont(13.5))
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
           .padding(.top, 3)
+      }
+
+      if model.reconciliationDiagnostics.configurationRequiresReload == true {
+        configurationChangedNotice
+          .padding(.top, 10)
       }
 
       if canReloadConfiguration || canDisableBundledDaemon {
@@ -377,6 +387,68 @@ struct RouteBarStatusView: View {
           .padding(.top, 7)
       }
 
+    }
+  }
+
+  private var reconciliationStatus: some View {
+    VStack(alignment: .leading, spacing: 5) {
+      ViewThatFits(in: .horizontal) {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+          Text("Last reconciliation")
+            .font(routeBarFont(15.5))
+          Spacer(minLength: 16)
+          Text(reconciliationDescription)
+            .font(routeBarFont(14).monospacedDigit())
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.trailing)
+        }
+
+        VStack(alignment: .leading, spacing: 7) {
+          Text("Last reconciliation")
+            .font(routeBarFont(15.5))
+          Text(reconciliationDescription)
+            .font(routeBarFont(14).monospacedDigit())
+            .foregroundStyle(.secondary)
+        }
+      }
+
+      if let error = model.reconciliationDiagnostics.lastError {
+        Text(error)
+          .font(routeBarFont(12.5))
+          .foregroundStyle(.red)
+          .fixedSize(horizontal: false, vertical: true)
+
+        if let lastSuccessfulAt = model.reconciliationDiagnostics.lastSuccessfulAt {
+          Text(
+            "Last successful at "
+              + lastSuccessfulAt.formatted(date: .omitted, time: .standard)
+          )
+          .font(routeBarFont(12.5).monospacedDigit())
+          .foregroundStyle(.secondary)
+        }
+      }
+    }
+    .padding(.vertical, 8)
+  }
+
+  private var configurationChangedNotice: some View {
+    HStack(alignment: .top, spacing: 8) {
+      Image(systemName: "document.badge.clock")
+        .font(.system(size: 13, weight: .semibold))
+        .foregroundStyle(.orange)
+        .padding(.top, 2)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: 2) {
+        Text("Configuration changed")
+          .font(routeBarFont(13, weight: .semibold))
+        Text(
+          "This YAML revision has not been confirmed yet. Reload it now or wait for the next "
+            + "automatic reconciliation."
+        )
+        .font(routeBarFont(12.5))
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      }
     }
   }
 
@@ -741,17 +813,29 @@ struct RouteBarStatusView: View {
         }
       }
 
-      launchAtLoginFeedback
-
-      Text(lastCheckedLabel)
-        .font(routeBarFont(12.5))
-        .foregroundStyle(.secondary)
+      footerStatus
+        .frame(minHeight: 20, alignment: .topLeading)
     }
     .padding(.horizontal, 30)
     .padding(.top, 14)
     .padding(.bottom, 16)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(Color(nsColor: .controlBackgroundColor))
+  }
+
+  @ViewBuilder
+  private var footerStatus: some View {
+    if model.launchAtLoginMutationState == .updating {
+      launchAtLoginFeedback
+    } else {
+      VStack(alignment: .leading, spacing: 8) {
+        launchAtLoginFeedback
+
+        Text(lastCheckedLabel)
+          .font(routeBarFont(12.5))
+          .foregroundStyle(.secondary)
+      }
+    }
   }
 
   private var footerActions: some View {
@@ -905,6 +989,12 @@ struct RouteBarStatusView: View {
     case .selectingProfile:
       return "Select a profile to build a read-only route plan"
     case .ready(let snapshot, _):
+      if model.reconciliationDiagnostics.configurationRequiresReload == true {
+        return "Configuration changed and is waiting to be applied"
+      }
+      if model.reconciliationDiagnostics.lastError != nil {
+        return "The last automatic reconciliation failed"
+      }
       if isHealthy(snapshot) {
         return "\(snapshot.activeCount) routes use the physical gateway"
       }
@@ -1006,10 +1096,40 @@ struct RouteBarStatusView: View {
   }
 
   private var bundledDaemonNeedsAttention: Bool {
-    switch model.bundledDaemonConnectionStatus {
+    if case .legacy = model.installedDaemon {
+      return false
+    }
+    if model.reconciliationDiagnostics.lastError != nil
+      || model.reconciliationDiagnostics.configurationRequiresReload == true
+    {
+      return true
+    }
+    return switch model.bundledDaemonConnectionStatus {
     case .versionMismatch, .unavailable: true
     case .notApplicable, .connected: false
     }
+  }
+
+  private var shouldShowReconciliationDiagnostics: Bool {
+    model.automaticReconciliationEnabled
+      || model.reconciliationDiagnostics.lastAttemptAt != nil
+      || model.reconciliationDiagnostics.lastError != nil
+  }
+
+  private var reconciliationDescription: String {
+    let diagnostics = model.reconciliationDiagnostics
+    let time = diagnostics.lastAttemptAt.map {
+      $0.formatted(date: .omitted, time: .standard)
+    }
+    if let result = diagnostics.lastResult {
+      let state = result.conflictCount == 0 ? "OK" : "Conflict"
+      let detail = "\(result.activeRouteCount) active · \(result.conflictCount) conflicts"
+      return [state, detail, time].compactMap { $0 }.joined(separator: " · ")
+    }
+    if diagnostics.lastError != nil {
+      return ["Failed", time].compactMap { $0 }.joined(separator: " · ")
+    }
+    return "Waiting for the first run"
   }
 
   private func updateDescription(_ checkedAt: Date) -> String {
@@ -1051,7 +1171,7 @@ struct RouteBarStatusView: View {
       return "Blocked by unknown service"
     }
     if isLegacyDaemonInstallation {
-      return "Migration required"
+      return "Not enabled"
     }
 
     return switch model.bundledDaemonStatus {
@@ -1076,7 +1196,7 @@ struct RouteBarStatusView: View {
     }
     if isLegacyDaemonInstallation {
       return
-        "The legacy service remains active. Built-in setup is blocked until it can be migrated safely."
+        "Automatic routing continues through the legacy service. No action is required in this build."
     }
 
     return switch model.bundledDaemonStatus {
@@ -1109,7 +1229,7 @@ struct RouteBarStatusView: View {
       return .red
     }
     if isLegacyDaemonInstallation {
-      return .orange
+      return .secondary
     }
 
     return switch model.bundledDaemonStatus {
@@ -1126,8 +1246,11 @@ struct RouteBarStatusView: View {
   }
 
   private func shouldShowFirstRunGuidance(for daemon: DaemonRuntimeStatus) -> Bool {
-    if isLegacyDaemonInstallation || isUnknownDaemonInstallation {
+    if isUnknownDaemonInstallation {
       return true
+    }
+    if isLegacyDaemonInstallation {
+      return false
     }
     if model.bundledDaemonStatus == .enabled {
       switch model.bundledDaemonConnectionStatus {
@@ -1150,7 +1273,7 @@ struct RouteBarStatusView: View {
       return "Unrecognized daemon installation"
     }
     if isLegacyDaemonInstallation {
-      return "Legacy service is still active"
+      return "Legacy service is active"
     }
     if case .selectingProfile = model.state {
       return "Choose a routing profile"
@@ -1180,7 +1303,7 @@ struct RouteBarStatusView: View {
     }
     if isLegacyDaemonInstallation {
       return
-        "Your current automatic routing keeps running. RouteBar will not enable the built-in service until a safe migration is explicitly started."
+        "Automatic routing continues to work normally. No action is required in this build."
     }
     if case .selectingProfile = model.state {
       return
@@ -1217,7 +1340,7 @@ struct RouteBarStatusView: View {
       return "exclamationmark.octagon"
     }
     if isLegacyDaemonInstallation {
-      return "arrow.triangle.2.circlepath"
+      return "checkmark.circle"
     }
     return "gearshape"
   }

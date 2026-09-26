@@ -58,6 +58,61 @@ final class DaemonOperationsTests: XCTestCase {
     XCTAssertNil(skipped)
   }
 
+  func testDiagnosticsTrackSuccessfulReconciliationAndConfigurationChanges() async throws {
+    let fixture = try OperationFixture()
+    defer { fixture.remove() }
+    let configurationService = fixture.configurationService()
+    _ = try await configurationService.configure(clientUID: 501, profileID: "work")
+    let service = RouteBarDaemonOperationService(
+      configurationService: configurationService,
+      reconciliationRunner: FakeReconciliationRunner()
+    )
+
+    let initial = await service.diagnostics()
+    XCTAssertNil(initial.lastAttemptAt)
+    XCTAssertNil(initial.configurationRequiresReload)
+
+    let result = try await service.reconcile(clientUID: 501)
+    let reconciled = await service.diagnostics()
+    XCTAssertNotNil(reconciled.lastAttemptAt)
+    XCTAssertNotNil(reconciled.lastSuccessfulAt)
+    XCTAssertEqual(reconciled.lastResult, result)
+    XCTAssertNil(reconciled.lastError)
+    XCTAssertEqual(reconciled.configurationRequiresReload, false)
+
+    try fixture.touchConfiguration()
+    let changed = await service.diagnostics()
+    XCTAssertEqual(changed.configurationRequiresReload, true)
+
+    _ = try await service.reconcileAutomatically()
+    let reapplied = await service.diagnostics()
+    XCTAssertEqual(reapplied.configurationRequiresReload, false)
+  }
+
+  func testDiagnosticsKeepTheLastSuccessWhenAChangedConfigurationFails() async throws {
+    let fixture = try OperationFixture()
+    defer { fixture.remove() }
+    let configurationService = fixture.configurationService()
+    _ = try await configurationService.configure(clientUID: 501, profileID: "work")
+    let service = RouteBarDaemonOperationService(
+      configurationService: configurationService,
+      reconciliationRunner: FakeReconciliationRunner()
+    )
+    _ = try await service.reconcile(clientUID: 501)
+    let successfulAt = await service.diagnostics().lastSuccessfulAt
+
+    try fixture.breakConfiguration()
+    await assertThrowsErrorAsync {
+      _ = try await service.reconcileAutomatically()
+    }
+
+    let failed = await service.diagnostics()
+    XCTAssertEqual(failed.lastSuccessfulAt, successfulAt)
+    XCTAssertNil(failed.lastResult)
+    XCTAssertNotNil(failed.lastError)
+    XCTAssertEqual(failed.configurationRequiresReload, true)
+  }
+
   func testConflictDoesNotEnableAutomaticReconciliation() async throws {
     let fixture = try OperationFixture()
     defer { fixture.remove() }
@@ -75,6 +130,12 @@ final class DaemonOperationsTests: XCTestCase {
     XCTAssertEqual(settings?.automaticReconciliationEnabled, false)
     let automaticResult = try await service.reconcileAutomatically()
     XCTAssertNil(automaticResult)
+
+    let diagnostics = await service.diagnostics()
+    XCTAssertNotNil(diagnostics.lastAttemptAt)
+    XCTAssertNil(diagnostics.lastSuccessfulAt)
+    XCTAssertEqual(diagnostics.lastResult?.conflictCount, 1)
+    XCTAssertNotNil(diagnostics.lastError)
   }
 
   func testAnotherUserCannotReconcileOrCleanup() async throws {
@@ -168,6 +229,7 @@ final class DaemonOperationsTests: XCTestCase {
 private struct OperationFixture {
   let rootURL: URL
   let homeURL: URL
+  let configURL: URL
   let store: FileRouteBarDaemonSettingsStore
 
   init() throws {
@@ -177,7 +239,7 @@ private struct OperationFixture {
     store = FileRouteBarDaemonSettingsStore(
       url: rootURL.appendingPathComponent("state/settings.json")
     )
-    let configURL = homeURL.appendingPathComponent(
+    configURL = homeURL.appendingPathComponent(
       ".config/routebar/config.yaml",
       isDirectory: false
     )
@@ -200,6 +262,19 @@ private struct OperationFixture {
 
   func remove() {
     try? FileManager.default.removeItem(at: rootURL)
+  }
+
+  func touchConfiguration() throws {
+    let source = try String(contentsOf: configURL, encoding: .utf8)
+    try (source + "\n# Edited outside RouteBar\n").write(
+      to: configURL,
+      atomically: true,
+      encoding: .utf8
+    )
+  }
+
+  func breakConfiguration() throws {
+    try "version: [not valid".write(to: configURL, atomically: true, encoding: .utf8)
   }
 
   private static let configuration = """

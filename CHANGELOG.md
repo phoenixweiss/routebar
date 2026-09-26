@@ -14,8 +14,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   disable its bundled routing daemon without requiring a source checkout.
 - Launch at login now uses an app-bundled `SMAppService` LaunchAgent and a fixed
   background launcher instead of installing a plist in the user's Library.
+- Updating from the legacy app preserves an enabled launch-at-login setting by
+  migrating it to the bundled login item.
 - The main window can reload YAML and reconcile routes immediately, with a clear
   applied or rejected result instead of waiting for the next 30-second cycle.
+- Automatic routing now reports its last reconciliation result and error, and
+  warns when an edited YAML revision has not yet been confirmed by the daemon.
 
 ### Changed
 
@@ -26,6 +30,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   routes, and RouteBar-owned state.
 - The English and Russian READMEs now use the RouteBar mark and describe the
   current app, shipped release, development service flow, and real limitations.
+
+### Fixed
+
+- A healthy legacy daemon now appears as normal active automation instead of a
+  warning or required migration; the unavailable built-in service remains
+  visible as a neutral secondary status.
+- The main window keeps a stable layout while the launch-at-login switch is
+  updating instead of briefly shifting the surrounding controls.
 
 ## [0.2.6] - 2026-09-26
 

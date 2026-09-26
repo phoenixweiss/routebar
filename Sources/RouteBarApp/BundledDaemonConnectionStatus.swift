@@ -31,15 +31,42 @@ struct BundledDaemonReadOnlyReport: Sendable, Equatable {
   let helperVersion: String
   let configuredProfileID: String?
   let automaticReconciliationEnabled: Bool
+  let reconciliationDiagnostics: BundledDaemonReconciliationDiagnostics
 
   init(
     helperVersion: String,
     configuredProfileID: String?,
-    automaticReconciliationEnabled: Bool = false
+    automaticReconciliationEnabled: Bool = false,
+    reconciliationDiagnostics: BundledDaemonReconciliationDiagnostics = .unknown
   ) {
     self.helperVersion = helperVersion
     self.configuredProfileID = configuredProfileID
     self.automaticReconciliationEnabled = automaticReconciliationEnabled
+    self.reconciliationDiagnostics = reconciliationDiagnostics
+  }
+}
+
+struct BundledDaemonReconciliationDiagnostics: Sendable, Equatable {
+  static let unknown = BundledDaemonReconciliationDiagnostics()
+
+  let lastAttemptAt: Date?
+  let lastSuccessfulAt: Date?
+  let lastResult: RouteBarDaemonOperationResult?
+  let lastError: String?
+  let configurationRequiresReload: Bool?
+
+  init(
+    lastAttemptAt: Date? = nil,
+    lastSuccessfulAt: Date? = nil,
+    lastResult: RouteBarDaemonOperationResult? = nil,
+    lastError: String? = nil,
+    configurationRequiresReload: Bool? = nil
+  ) {
+    self.lastAttemptAt = lastAttemptAt
+    self.lastSuccessfulAt = lastSuccessfulAt
+    self.lastResult = lastResult
+    self.lastError = lastError
+    self.configurationRequiresReload = configurationRequiresReload
   }
 }
 
@@ -86,7 +113,14 @@ struct SystemBundledDaemonReadOnlyInspector: BundledDaemonReadOnlyInspecting {
     return BundledDaemonReadOnlyReport(
       helperVersion: version.helperVersion,
       configuredProfileID: status.configuredProfileID,
-      automaticReconciliationEnabled: status.automaticReconciliationEnabled
+      automaticReconciliationEnabled: status.automaticReconciliationEnabled,
+      reconciliationDiagnostics: BundledDaemonReconciliationDiagnostics(
+        lastAttemptAt: status.lastReconciliationAttemptAt,
+        lastSuccessfulAt: status.lastSuccessfulReconciliationAt,
+        lastResult: status.lastReconciliationResult,
+        lastError: status.lastError,
+        configurationRequiresReload: status.configurationRequiresReload
+      )
     )
   }
 }

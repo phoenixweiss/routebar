@@ -168,6 +168,10 @@ public enum ConfigurationLoader {
 
   public static func load(from url: URL = defaultURL) throws -> RouteBarConfiguration {
     let source = try String(contentsOf: url, encoding: .utf8)
+    return try load(source: source)
+  }
+
+  public static func load(source: String) throws -> RouteBarConfiguration {
     let configuration: RouteBarConfiguration
     do {
       configuration = try YAMLDecoder().decode(RouteBarConfiguration.self, from: source)

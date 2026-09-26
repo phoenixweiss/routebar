@@ -48,6 +48,8 @@ On first launch, Control-click RouteBar, choose **Open**, and confirm the launch
 - reconciles RouteBar-owned routes every 30 seconds after network, DNS, wake, or
   VPN changes;
 - reloads edited YAML immediately with a visible applied or rejected result;
+- reports the last reconciliation result and warns while an edited YAML revision
+  is still waiting for daemon confirmation;
 - updates or disables the bundled service without deleting the YAML;
 - removes only routes still matching RouteBar's own root-owned state.
 

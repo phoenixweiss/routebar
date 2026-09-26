@@ -13,6 +13,7 @@ agent_path="$HOME/Library/LaunchAgents/$label.plist"
 legacy_agent_path="$HOME/Library/LaunchAgents/$legacy_label.plist"
 uid=$(id -u)
 lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+restore_launch_at_login=false
 
 temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/routebar-app-install.XXXXXX")
 temporary_app="$temporary_dir/RouteBar.app"
@@ -30,6 +31,7 @@ if [ -e "$agent_path" ]; then
     echo "Refusing to replace an unexpected launch agent: $agent_path" >&2
     exit 1
   fi
+  restore_launch_at_login=true
 fi
 
 if [ -e "$legacy_agent_path" ]; then
@@ -38,6 +40,11 @@ if [ -e "$legacy_agent_path" ]; then
     echo "Refusing to replace an unexpected launch agent: $legacy_agent_path" >&2
     exit 1
   fi
+  restore_launch_at_login=true
+fi
+
+if launchctl print "gui/$uid/io.github.phoenixweiss.routebar.login" >/dev/null 2>&1; then
+  restore_launch_at_login=true
 fi
 
 if [ -e "$app_path" ]; then
@@ -80,8 +87,15 @@ if [ -e "$app_path" ]; then
 fi
 mv "$temporary_app" "$app_path"
 "$lsregister" -f "$app_path"
+if [ "$restore_launch_at_login" = true ]; then
+  "$executable_path" --register-login-item
+fi
 open "$app_path"
 
 echo "RouteBar menu and status window are installed and open."
 echo "Application: $app_path"
-echo "Enable Launch at Login in the RouteBar window if desired."
+if [ "$restore_launch_at_login" = true ]; then
+  echo "Launch at Login was migrated to the bundled login item."
+else
+  echo "Enable Launch at Login in the RouteBar window if desired."
+fi

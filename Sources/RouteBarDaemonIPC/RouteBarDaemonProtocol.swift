@@ -1,7 +1,7 @@
 import Foundation
 
 public enum RouteBarDaemonProtocolVersion {
-  public static let current = 2
+  public static let current = 3
 }
 
 public enum RouteBarDaemonRequest: Codable, Sendable, Equatable {
@@ -29,18 +29,30 @@ public struct RouteBarDaemonStatus: Codable, Sendable, Equatable {
   public let helperVersion: String
   public let configuredProfileID: String?
   public let automaticReconciliationEnabled: Bool
+  public let lastReconciliationAttemptAt: Date?
+  public let lastSuccessfulReconciliationAt: Date?
+  public let lastReconciliationResult: RouteBarDaemonOperationResult?
   public let lastError: String?
+  public let configurationRequiresReload: Bool?
 
   public init(
     helperVersion: String,
     configuredProfileID: String?,
     automaticReconciliationEnabled: Bool = false,
-    lastError: String? = nil
+    lastReconciliationAttemptAt: Date? = nil,
+    lastSuccessfulReconciliationAt: Date? = nil,
+    lastReconciliationResult: RouteBarDaemonOperationResult? = nil,
+    lastError: String? = nil,
+    configurationRequiresReload: Bool? = nil
   ) {
     self.helperVersion = helperVersion
     self.configuredProfileID = configuredProfileID
     self.automaticReconciliationEnabled = automaticReconciliationEnabled
+    self.lastReconciliationAttemptAt = lastReconciliationAttemptAt
+    self.lastSuccessfulReconciliationAt = lastSuccessfulReconciliationAt
+    self.lastReconciliationResult = lastReconciliationResult
     self.lastError = lastError
+    self.configurationRequiresReload = configurationRequiresReload
   }
 }
 
