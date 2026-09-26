@@ -122,7 +122,8 @@ jobs:
             test "$remote_digest" = "$local_digest"
           done
 
-          gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${GITHUB_REF_NAME}" \
+          gh release view "$GITHUB_REF_NAME" \
+            --json body \
             --jq .body > dist/remote-release-notes.md
           cmp dist/release-notes.md dist/remote-release-notes.md
 

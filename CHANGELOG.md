@@ -8,6 +8,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- Draft release-note verification now reads the draft through GitHub CLI instead
+  of the public tag endpoint, which does not expose unpublished releases.
+
 ## [0.2.4] - 2026-09-26
 
 ### Added
