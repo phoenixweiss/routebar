@@ -122,10 +122,9 @@ jobs:
             test "$remote_digest" = "$local_digest"
           done
 
-          gh release view "$GITHUB_REF_NAME" \
-            --json body \
-            --jq .body > dist/remote-release-notes.md
-          cmp dist/release-notes.md dist/remote-release-notes.md
+          local_notes="$(cat dist/release-notes.md)"
+          remote_notes="$(gh release view "$GITHUB_REF_NAME" --json body --jq .body)"
+          test "$remote_notes" = "$local_notes"
 
           gh release edit "$GITHUB_REF_NAME" \
             --draft=false \

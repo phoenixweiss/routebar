@@ -8,6 +8,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- Draft release-note comparison now ignores the extra trailing newline emitted
+  by GitHub CLI while still requiring the complete published body to match.
+
 ## [0.2.5] - 2026-09-26
 
 ### Fixed
