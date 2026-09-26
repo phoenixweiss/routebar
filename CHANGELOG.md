@@ -8,6 +8,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- The RouteBar menu bar mark now uses a larger optical scale and slightly
+  stronger strokes to match the visual weight of neighboring system icons.
+
 ## [0.2.2] - 2026-09-26
 
 ### Fixed

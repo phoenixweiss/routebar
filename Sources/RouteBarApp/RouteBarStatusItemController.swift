@@ -46,29 +46,29 @@ final class RouteBarStatusItemController: NSObject {
     let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
       NSColor.black.setStroke()
 
-      let circle = NSBezierPath(ovalIn: NSRect(x: 4, y: 4, width: 10, height: 10))
-      circle.lineWidth = 1.2
+      let circle = NSBezierPath(ovalIn: NSRect(x: 2.25, y: 2.25, width: 13.5, height: 13.5))
+      circle.lineWidth = 1.3
       circle.stroke()
 
       for points in [
         [
-          NSPoint(x: 1.5, y: 6), NSPoint(x: 7, y: 6), NSPoint(x: 10.5, y: 9),
-          NSPoint(x: 16.5, y: 9),
+          NSPoint(x: 0.75, y: 4.5), NSPoint(x: 7.5, y: 4.5), NSPoint(x: 11, y: 9),
+          NSPoint(x: 17.25, y: 9),
         ],
         [
-          NSPoint(x: 1.5, y: 9), NSPoint(x: 6.5, y: 9), NSPoint(x: 10, y: 12),
-          NSPoint(x: 16.5, y: 12),
+          NSPoint(x: 0.75, y: 9), NSPoint(x: 7.25, y: 9), NSPoint(x: 10.75, y: 13.5),
+          NSPoint(x: 17.25, y: 13.5),
         ],
         [
-          NSPoint(x: 1.5, y: 12), NSPoint(x: 7, y: 12), NSPoint(x: 10.5, y: 6),
-          NSPoint(x: 16.5, y: 6),
+          NSPoint(x: 0.75, y: 13.5), NSPoint(x: 7.5, y: 13.5), NSPoint(x: 11, y: 4.5),
+          NSPoint(x: 17.25, y: 4.5),
         ],
       ] {
         let route = NSBezierPath()
         route.move(to: points[0])
         route.line(to: points[1])
         route.curve(to: points[3], controlPoint1: points[1], controlPoint2: points[2])
-        route.lineWidth = 1.35
+        route.lineWidth = 1.5
         route.lineCapStyle = .round
         route.lineJoinStyle = .round
         route.stroke()
