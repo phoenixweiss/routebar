@@ -13,6 +13,22 @@ root-owned reconciliation process, and a native status app available from both
 the menu bar and a regular window. RouteBar is not a VPN client and does not
 replace or reconfigure the system default route.
 
+## Download
+
+The current release is
+[RouteBar 0.2.3](https://github.com/phoenixweiss/routebar/releases/tag/v0.2.3) for
+Apple silicon Macs running macOS 13 or later. Download the DMG, open it, and copy
+RouteBar to Applications.
+
+The app bundle is ad-hoc signed for integrity, but it is not yet Developer ID
+signed or notarized. macOS therefore requires explicit approval on first launch:
+Control-click RouteBar, choose **Open**, and confirm the launch. The published
+SHA-256 checksum is included in `SHA256SUMS.txt`.
+
+The DMG installs the native status app. The root-owned reconciliation daemon still
+requires the source installer described under [Automatic reconciliation](#automatic-reconciliation),
+because its installation must name an explicit profile and configuration path.
+
 ## Roadmap
 
 The current development build already:
@@ -110,6 +126,13 @@ Build, install, and open the native app for the current user:
 script/install-app
 ```
 
+Build the same app bundle or release DMG without installing it:
+
+```bash
+script/build-app /tmp/RouteBar.app
+script/package-release
+```
+
 The app is installed at `~/Applications/RouteBar.app` and starts automatically
 at login in the menu bar. Choose **Open Window** in the menu or launch RouteBar
 from Spotlight or Finder to open the full status window. **Show in Dock** keeps a
@@ -163,9 +186,15 @@ and release notes accumulate under `Unreleased` in `CHANGELOG.md`.
 The project uses [Bumpster](https://github.com/phoenixweiss/bumpster) with `dev`
 as the development branch and `main` as the release branch. A Bumpster release
 runs `script/check`, moves the pending changelog entries into a dated release,
-updates `VERSION`, and atomically publishes both branches and the `vX.Y.Z` tag.
-Creating a GitHub Release or distributing a signed package remains a separate,
-explicit step.
+updates the current-release links in both READMEs, updates `VERSION`, and atomically
+publishes both branches and the `vX.Y.Z` tag.
+
+The tag starts the macOS release workflow. It checks the exact tagged source,
+builds and verifies an Apple silicon DMG, publishes its SHA-256 checksum, and uses
+the matching version section from `CHANGELOG.md` as the GitHub Release notes. The
+workflow first uploads a draft, verifies the published asset digests and notes,
+and only then makes the GitHub Release public. Local packaging never publishes a
+release.
 
 ## License
 

@@ -1,0 +1,68 @@
+#!/bin/sh
+
+set -eu
+
+if [ "$#" -ne 1 ]; then
+  echo "Usage: script/changelog-release-notes vMAJOR.MINOR.PATCH" >&2
+  exit 64
+fi
+
+tag=$1
+case "$tag" in
+  v[0-9]*.[0-9]*.[0-9]*) version=${tag#v} ;;
+  *)
+    echo "Release tag must have the form vMAJOR.MINOR.PATCH." >&2
+    exit 1
+    ;;
+esac
+
+if ! printf '%s\n' "$version" | grep -Eq \
+  '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
+  echo "Release tag must have the form vMAJOR.MINOR.PATCH." >&2
+  exit 1
+fi
+
+project_dir=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd -P)
+changelog_file=${CHANGELOG_FILE:-"$project_dir/CHANGELOG.md"}
+temporary_file=$(mktemp "${TMPDIR:-/tmp}/routebar-release-notes.XXXXXX")
+cleanup_temporary_file() {
+  rm -f "$temporary_file" 2>/dev/null || true
+}
+trap cleanup_temporary_file EXIT
+trap 'exit 1' HUP INT TERM
+
+awk -v version="$version" '
+  $0 ~ "^## \\[" version "\\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$" {
+    found = 1
+    active = 1
+    next
+  }
+  active && /^## \[/ { active = 0 }
+  active { print }
+  END {
+    if (!found) exit 2
+  }
+' "$changelog_file" > "$temporary_file" || {
+  echo "CHANGELOG.md has no dated section for $tag." >&2
+  exit 1
+}
+
+if ! grep -Eq '^### (Added|Changed|Deprecated|Removed|Fixed|Security)$' \
+  "$temporary_file"; then
+  echo "The $tag changelog section has no categorized release notes." >&2
+  exit 1
+fi
+
+awk '
+  BEGIN { started = 0; pending = 0 }
+  /^[[:space:]]*$/ {
+    if (started) pending = 1
+    next
+  }
+  {
+    if (pending) print ""
+    print
+    started = 1
+    pending = 0
+  }
+' "$temporary_file"

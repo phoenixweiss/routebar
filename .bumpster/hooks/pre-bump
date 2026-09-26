@@ -11,4 +11,4 @@ cd "$project_root"
 script/check
 script/prepare-release-changelog
 git diff --check
-git add CHANGELOG.md
+git add CHANGELOG.md README.md README_RU.md

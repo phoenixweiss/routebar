@@ -7,10 +7,13 @@ set -eu
 
 changelog_file=${CHANGELOG_FILE:-CHANGELOG.md}
 version_file=${VERSION_FILE:-VERSION}
+readme_file=${README_FILE:-README.md}
+readme_ru_file=${README_RU_FILE:-README_RU.md}
 repository_url=https://github.com/phoenixweiss/routebar
 
-if [ ! -f "$changelog_file" ] || [ ! -f "$version_file" ]; then
-  echo "CHANGELOG.md and VERSION must exist before preparing a release." >&2
+if [ ! -f "$changelog_file" ] || [ ! -f "$version_file" ] \
+  || [ ! -f "$readme_file" ] || [ ! -f "$readme_ru_file" ]; then
+  echo "CHANGELOG.md, VERSION, README.md, and README_RU.md must exist before preparing a release." >&2
   exit 1
 fi
 
@@ -36,12 +39,16 @@ if [ "$unreleased_lines" -eq 0 ]; then
   exit 1
 fi
 
-release_date=$(date +%Y-%m-%d)
+release_date=${BUMPSTER_RELEASE_DATE:-$(date +%Y-%m-%d)}
 temporary_file=$(mktemp "${TMPDIR:-/tmp}/routebar-changelog.XXXXXX")
 links_file="$temporary_file.links"
+temporary_readme=$(mktemp "${TMPDIR:-/tmp}/routebar-readme.XXXXXX")
+temporary_readme_ru=$(mktemp "${TMPDIR:-/tmp}/routebar-readme-ru.XXXXXX")
 cleanup_temporary_file() {
   rm -f "$temporary_file" 2>/dev/null || true
   rm -f "$links_file" 2>/dev/null || true
+  rm -f "$temporary_readme" 2>/dev/null || true
+  rm -f "$temporary_readme_ru" 2>/dev/null || true
 }
 trap cleanup_temporary_file EXIT
 trap 'exit 1' HUP INT TERM
@@ -94,6 +101,35 @@ else
   } >> "$temporary_file"
 fi
 
+previous_release_link="[RouteBar $BUMPSTER_PREV_VERSION]($repository_url/releases/tag/v$BUMPSTER_PREV_VERSION)"
+next_release_link="[RouteBar $BUMPSTER_NEW_VERSION]($repository_url/releases/tag/v$BUMPSTER_NEW_VERSION)"
+prepare_readme() {
+  input_file=$1
+  output_file=$2
+  awk -v previous="$previous_release_link" -v replacement="$next_release_link" '
+    {
+      position = index($0, previous)
+      if (position > 0) {
+        matches += 1
+        $0 = substr($0, 1, position - 1) replacement substr($0, position + length(previous))
+      }
+      print
+    }
+    END {
+      if (matches != 1) exit 2
+    }
+  ' "$input_file" > "$output_file" || {
+    echo "$input_file must contain exactly one current RouteBar release link." >&2
+    exit 1
+  }
+}
+
+prepare_readme "$readme_file" "$temporary_readme"
+prepare_readme "$readme_ru_file" "$temporary_readme_ru"
+
 chmod 0644 "$temporary_file"
+chmod 0644 "$temporary_readme" "$temporary_readme_ru"
 mv "$temporary_file" "$changelog_file"
+mv "$temporary_readme" "$readme_file"
+mv "$temporary_readme_ru" "$readme_ru_file"
 trap - EXIT

@@ -1,0 +1,132 @@
+name: Release macOS
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish Apple silicon release
+    runs-on: macos-15
+    timeout-minutes: 30
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out the tagged source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Validate the release tag and runner
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < VERSION)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "$GITHUB_REF_NAME" = "v${version}"
+          test "$(uname -m)" = "arm64"
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+
+      - name: Run project checks
+        run: script/check
+
+      - name: Package the macOS release
+        run: script/package-release
+
+      - name: Prepare release notes from the changelog
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ steps.release.outputs.version }}"
+          cat > dist/release-notes.md <<EOF
+          RouteBar ${version} is available for Apple silicon Macs running macOS 13 or later.
+
+          The app bundle is ad-hoc signed for integrity, but it is not Developer ID signed or notarized. After copying RouteBar to Applications, Control-click the app, choose **Open**, and confirm the first launch.
+
+          The DMG installs the native status app. The root-owned reconciliation daemon still requires the documented source installer and an explicit profile and configuration path.
+
+          ## Changes
+
+          EOF
+          script/changelog-release-notes "$GITHUB_REF_NAME" >> dist/release-notes.md
+
+      - name: Verify the packaged DMG
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ steps.release.outputs.version }}"
+          dmg="dist/RouteBar-${version}-arm64.dmg"
+          mount_dir="$(mktemp -d)"
+          cleanup() {
+            hdiutil detach "$mount_dir" >/dev/null 2>&1 || true
+            rmdir "$mount_dir" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          test -f "$dmg"
+          hdiutil verify "$dmg"
+          (cd dist && shasum -a 256 -c SHA256SUMS.txt)
+          hdiutil attach -nobrowse -readonly -mountpoint "$mount_dir" "$dmg" >/dev/null
+
+          app="$mount_dir/RouteBar.app"
+          test -L "$mount_dir/Applications"
+          test "$(readlink "$mount_dir/Applications")" = '/Applications'
+          test "$(plutil -extract CFBundleShortVersionString raw -o - "$app/Contents/Info.plist")" = "$version"
+          test "$(plutil -extract CFBundleIdentifier raw -o - "$app/Contents/Info.plist")" = 'io.github.phoenixweiss.routebar.menu'
+          file "$app/Contents/MacOS/routebar-app" | grep -q 'arm64'
+          codesign --verify --deep --strict --verbose=4 "$app"
+
+      - name: Upload a verified draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          version="${{ steps.release.outputs.version }}"
+          gh release create "$GITHUB_REF_NAME" \
+            "dist/RouteBar-${version}-arm64.dmg#macOS Apple silicon DMG (ad-hoc signed)" \
+            "dist/SHA256SUMS.txt#SHA-256 checksum" \
+            --draft \
+            --fail-on-no-commits \
+            --latest=false \
+            --notes-file dist/release-notes.md \
+            --title "RouteBar ${version}" \
+            --verify-tag
+
+      - name: Verify and publish the draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          version="${{ steps.release.outputs.version }}"
+
+          for asset in \
+            "dist/RouteBar-${version}-arm64.dmg" \
+            "dist/SHA256SUMS.txt"
+          do
+            name="$(basename "$asset")"
+            local_digest="sha256:$(shasum -a 256 "$asset" | awk '{print $1}')"
+            remote_digest="$(gh release view "$GITHUB_REF_NAME" --json assets --jq ".assets[] | select(.name == \"${name}\") | .digest")"
+            test "$remote_digest" = "$local_digest"
+          done
+
+          gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${GITHUB_REF_NAME}" \
+            --jq .body > dist/remote-release-notes.md
+          cmp dist/release-notes.md dist/remote-release-notes.md
+
+          gh release edit "$GITHUB_REF_NAME" \
+            --draft=false \
+            --latest \
+            --verify-tag

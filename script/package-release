@@ -1,0 +1,75 @@
+#!/bin/sh
+
+set -eu
+
+project_dir=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd -P)
+if [ "$#" -gt 1 ]; then
+  echo "Usage: script/package-release [OUTPUT_DIRECTORY]" >&2
+  exit 64
+fi
+
+output_dir=${1:-"$project_dir/dist"}
+case "$output_dir" in
+  /*) ;;
+  *) output_dir="$PWD/$output_dir" ;;
+esac
+
+version=$(tr -d '\n' < "$project_dir/VERSION")
+architecture=$(uname -m)
+case "$architecture" in
+  arm64|x86_64) ;;
+  *)
+    echo "Unsupported release architecture: $architecture" >&2
+    exit 1
+    ;;
+esac
+
+artifact_name="RouteBar-$version-$architecture.dmg"
+dmg_path="$output_dir/$artifact_name"
+checksums_path="$output_dir/SHA256SUMS.txt"
+if [ -e "$dmg_path" ] || [ -e "$checksums_path" ]; then
+  echo "Refusing to replace existing release artifacts in $output_dir." >&2
+  exit 1
+fi
+
+temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/routebar-release.XXXXXX")
+staging_dir="$temporary_dir/staging"
+temporary_dmg="$temporary_dir/$artifact_name"
+cleanup_temporary_files() {
+  rm -rf "$temporary_dir" 2>/dev/null || true
+}
+trap cleanup_temporary_files EXIT
+trap 'exit 1' HUP INT TERM
+
+mkdir -p "$staging_dir"
+"$project_dir/script/build-app" "$staging_dir/RouteBar.app"
+ln -s /Applications "$staging_dir/Applications"
+
+bundle_version=$(plutil -extract CFBundleShortVersionString raw -o - \
+  "$staging_dir/RouteBar.app/Contents/Info.plist")
+if [ "$bundle_version" != "$version" ]; then
+  echo "Application bundle version does not match VERSION." >&2
+  exit 1
+fi
+file "$staging_dir/RouteBar.app/Contents/MacOS/routebar-app" | grep -q "$architecture"
+codesign --verify --deep --strict --verbose=4 "$staging_dir/RouteBar.app"
+
+hdiutil create \
+  -volname "RouteBar $version" \
+  -srcfolder "$staging_dir" \
+  -format UDZO \
+  -ov \
+  "$temporary_dmg" >/dev/null
+hdiutil verify "$temporary_dmg" >/dev/null
+
+mkdir -p "$output_dir"
+mv "$temporary_dmg" "$dmg_path"
+(
+  cd "$output_dir"
+  shasum -a 256 "$artifact_name" > "$(basename "$checksums_path")"
+  shasum -a 256 -c "$(basename "$checksums_path")"
+)
+
+echo "Packaged RouteBar $version for $architecture:"
+echo "$dmg_path"
+echo "$checksums_path"

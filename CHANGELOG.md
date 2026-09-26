@@ -8,6 +8,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- A tag-driven macOS release workflow now builds and verifies an Apple silicon
+  DMG and SHA-256 checksum before publishing a GitHub Release.
+- Continuous integration now runs the complete project checks on development,
+  release, and pull-request changes.
+
+### Changed
+
+- GitHub Release notes now come from the matching dated section of this changelog.
+- Release preparation now updates the current-download links in both READMEs, and
+  local app installation and DMG packaging share the same verified bundle builder.
+
 ## [0.2.3] - 2026-09-26
 
 ### Changed

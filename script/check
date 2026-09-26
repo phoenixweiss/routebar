@@ -11,10 +11,15 @@ swift run routebar validate --config examples/routebar.yaml
 sh -n script/install-daemon
 sh -n script/uninstall-daemon
 sh -n script/install-app
+sh -n script/build-app
 sh -n script/build-app-icon
+sh -n script/changelog-release-notes
+sh -n script/package-release
+sh -n script/check-release-tools
 sh -n script/uninstall-app
 sh -n script/prepare-release-changelog
 bash -n .bumpster/hooks/pre-bump
+script/check-release-tools
 plutil -lint Support/io.github.phoenixweiss.routebar.plist >/dev/null
 plutil -lint Support/RouteBarApp-Info.plist >/dev/null
 plutil -lint Support/io.github.phoenixweiss.routebar.menu.plist >/dev/null

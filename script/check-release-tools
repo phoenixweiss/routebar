@@ -1,0 +1,71 @@
+#!/bin/sh
+
+set -eu
+
+project_dir=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd -P)
+temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/routebar-release-tools.XXXXXX")
+cleanup_temporary_files() {
+  rm -rf "$temporary_dir" 2>/dev/null || true
+}
+trap cleanup_temporary_files EXIT
+trap 'exit 1' HUP INT TERM
+
+cat > "$temporary_dir/VERSION" <<'EOF'
+1.2.3
+EOF
+cat > "$temporary_dir/CHANGELOG.md" <<'EOF'
+# Changelog
+
+## [Unreleased]
+
+### Added
+
+- A release workflow.
+
+## [1.2.3] - 2026-09-25
+
+### Fixed
+
+- An earlier issue.
+
+[Unreleased]: https://github.com/phoenixweiss/routebar/compare/v1.2.3...HEAD
+[1.2.3]: https://github.com/phoenixweiss/routebar/releases/tag/v1.2.3
+EOF
+for readme in README.md README_RU.md; do
+  cat > "$temporary_dir/$readme" <<'EOF'
+[RouteBar 1.2.3](https://github.com/phoenixweiss/routebar/releases/tag/v1.2.3)
+EOF
+done
+
+BUMPSTER_PREV_VERSION=1.2.3 \
+BUMPSTER_NEW_VERSION=1.2.4 \
+BUMPSTER_RELEASE_DATE=2026-09-26 \
+CHANGELOG_FILE="$temporary_dir/CHANGELOG.md" \
+VERSION_FILE="$temporary_dir/VERSION" \
+README_FILE="$temporary_dir/README.md" \
+README_RU_FILE="$temporary_dir/README_RU.md" \
+  "$project_dir/script/prepare-release-changelog"
+
+grep -Fqx '## [1.2.4] - 2026-09-26' "$temporary_dir/CHANGELOG.md"
+grep -Fqx \
+  '[Unreleased]: https://github.com/phoenixweiss/routebar/compare/v1.2.4...HEAD' \
+  "$temporary_dir/CHANGELOG.md"
+grep -Fqx \
+  '[1.2.4]: https://github.com/phoenixweiss/routebar/compare/v1.2.3...v1.2.4' \
+  "$temporary_dir/CHANGELOG.md"
+grep -Fqx \
+  '[RouteBar 1.2.4](https://github.com/phoenixweiss/routebar/releases/tag/v1.2.4)' \
+  "$temporary_dir/README.md"
+grep -Fqx \
+  '[RouteBar 1.2.4](https://github.com/phoenixweiss/routebar/releases/tag/v1.2.4)' \
+  "$temporary_dir/README_RU.md"
+
+CHANGELOG_FILE="$temporary_dir/CHANGELOG.md" \
+  "$project_dir/script/changelog-release-notes" v1.2.4 \
+  > "$temporary_dir/release-notes.md"
+cat > "$temporary_dir/expected-release-notes.md" <<'EOF'
+### Added
+
+- A release workflow.
+EOF
+cmp "$temporary_dir/expected-release-notes.md" "$temporary_dir/release-notes.md"
