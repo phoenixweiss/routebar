@@ -1,6 +1,6 @@
 # RouteBar
 
-<p align="center"><img src="Support/RouteBarAppIcon.svg" alt="RouteBar" width="144"></p>
+<p align="center"><img src="docs/brand/routebar-lockup.svg" alt="RouteBar" width="420"></p>
 
 <p align="center"><strong>Keep selected destinations outside the VPN.</strong></p>
 
@@ -29,12 +29,6 @@ copy RouteBar to Applications. The release includes a SHA-256 checksum.
 
 The app is ad-hoc signed, but it is not yet Developer ID signed or notarized.
 On first launch, Control-click RouteBar, choose **Open**, and confirm the launch.
-
-> **Development status:** the `dev` branch contains the new app-bundled routing
-> service and its complete in-app setup, update, reload, and removal flow. This
-> flow is covered by automated app-bundle and operation tests, but it has not yet
-> shipped in a notarized DMG or completed clean-Mac installation verification.
-> Release 0.2.6 still uses the source installer for automatic routing.
 
 ## What RouteBar does
 
@@ -167,6 +161,12 @@ updates both README release links, updates `VERSION`, and publishes the matching
 tag. The tag-driven workflow builds and verifies the Apple silicon DMG and
 SHA-256 checksum, uses the matching changelog section as release notes, verifies
 the draft assets, and only then publishes the GitHub Release.
+
+## Brand assets
+
+The public RouteBar mark, lockup, app icon sources, and usage notes live in
+[docs/brand](docs/brand/README.md). Generated PNG and macOS ICNS derivatives are
+kept with their SVG masters and checked for drift by the normal quality suite.
 
 ## License
 

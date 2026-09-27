@@ -1,0 +1,24 @@
+#!/bin/sh
+
+set -eu
+
+project_dir=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd -P)
+brand_dir="$project_dir/docs/brand"
+
+if ! command -v rsvg-convert >/dev/null 2>&1; then
+  echo "rsvg-convert is required to build the brand assets." >&2
+  exit 1
+fi
+
+rsvg-convert -w 1234 -h 320 \
+  -o "$brand_dir/routebar-lockup.png" \
+  "$brand_dir/routebar-lockup.svg"
+rsvg-convert -w 1024 -h 1024 \
+  -o "$brand_dir/routebar-mark.png" \
+  "$brand_dir/routebar-mark.svg"
+rsvg-convert -w 1024 -h 1024 \
+  -o "$brand_dir/routebar-app-icon.png" \
+  "$brand_dir/routebar-app-icon.svg"
+
+"$project_dir/script/build-app-icon"
+echo "Built RouteBar brand assets."

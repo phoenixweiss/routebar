@@ -60,7 +60,7 @@ install -m 0644 "$project_dir/Support/io.github.phoenixweiss.routebar.bundled.pl
   "$temporary_app/Contents/Library/LaunchDaemons/io.github.phoenixweiss.routebar.plist"
 plutil -replace EnvironmentVariables.ROUTEBAR_HELPER_VERSION -string "$version" \
   "$temporary_app/Contents/Library/LaunchDaemons/io.github.phoenixweiss.routebar.plist"
-install -m 0644 "$project_dir/Support/RouteBar.icns" \
+install -m 0644 "$project_dir/docs/brand/macos/RouteBar.icns" \
   "$temporary_app/Contents/Resources/RouteBar.icns"
 install -m 0644 "$project_dir/Support/Fonts/Manrope-Variable.ttf" \
   "$temporary_app/Contents/Resources/Fonts/Manrope-Variable.ttf"

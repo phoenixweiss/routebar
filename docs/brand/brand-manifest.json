@@ -1,0 +1,68 @@
+{
+  "root": ".",
+  "assets": [
+    {
+      "path": "routebar-lockup.svg",
+      "type": "svg",
+      "no_live_text": true,
+      "no_images": true
+    },
+    {
+      "path": "routebar-lockup.png",
+      "type": "png",
+      "width": 1234,
+      "height": 320,
+      "alpha": "required"
+    },
+    {
+      "path": "routebar-mark.svg",
+      "type": "svg",
+      "no_live_text": true,
+      "no_images": true
+    },
+    {
+      "path": "routebar-mark.png",
+      "type": "png",
+      "width": 1024,
+      "height": 1024,
+      "alpha": "required"
+    },
+    {
+      "path": "routebar-app-icon.svg",
+      "type": "svg",
+      "no_live_text": true,
+      "no_images": true
+    },
+    {
+      "path": "routebar-app-icon-small.svg",
+      "type": "svg",
+      "no_live_text": true,
+      "no_images": true
+    },
+    {
+      "path": "routebar-app-icon.png",
+      "type": "png",
+      "width": 1024,
+      "height": 1024,
+      "alpha": "required"
+    },
+    {
+      "path": "routebar-menu-bar-symbol.svg",
+      "type": "svg",
+      "no_live_text": true,
+      "no_images": true
+    },
+    {
+      "path": "macos/RouteBar.icns",
+      "type": "icns"
+    },
+    {
+      "path": "README.md",
+      "type": "md"
+    },
+    {
+      "path": "README_RU.md",
+      "type": "md"
+    }
+  ]
+}

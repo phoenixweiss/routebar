@@ -1,0 +1,51 @@
+#!/bin/sh
+
+set -eu
+
+project_dir=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd -P)
+brand_dir="$project_dir/docs/brand"
+
+if ! command -v rsvg-convert >/dev/null 2>&1; then
+  echo "rsvg-convert is required to check the brand assets." >&2
+  exit 1
+fi
+
+temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/routebar-brand.XXXXXX")
+cleanup_temporary_files() {
+  rm -rf "$temporary_dir" 2>/dev/null || true
+}
+trap cleanup_temporary_files EXIT
+trap 'exit 1' HUP INT TERM
+
+rsvg-convert -w 1234 -h 320 \
+  -o "$temporary_dir/routebar-lockup.png" \
+  "$brand_dir/routebar-lockup.svg"
+rsvg-convert -w 1024 -h 1024 \
+  -o "$temporary_dir/routebar-mark.png" \
+  "$brand_dir/routebar-mark.svg"
+rsvg-convert -w 1024 -h 1024 \
+  -o "$temporary_dir/routebar-app-icon.png" \
+  "$brand_dir/routebar-app-icon.svg"
+
+for asset in routebar-lockup.png routebar-mark.png routebar-app-icon.png; do
+  if ! cmp -s "$temporary_dir/$asset" "$brand_dir/$asset"; then
+    echo "$brand_dir/$asset is out of date; run script/build-brand-assets." >&2
+    exit 1
+  fi
+done
+
+"$project_dir/script/build-app-icon" "$temporary_dir/RouteBar.icns" >/dev/null
+if ! cmp -s "$temporary_dir/RouteBar.icns" "$brand_dir/macos/RouteBar.icns"; then
+  echo "$brand_dir/macos/RouteBar.icns is out of date; run script/build-brand-assets." >&2
+  exit 1
+fi
+
+for asset in routebar-lockup.svg routebar-mark.svg routebar-app-icon.svg \
+  routebar-app-icon-small.svg routebar-menu-bar-symbol.svg; do
+  if grep -Eq '<(text|image)([[:space:]>])' "$brand_dir/$asset"; then
+    echo "$brand_dir/$asset must not contain live text or embedded images." >&2
+    exit 1
+  fi
+done
+
+echo "Brand assets match their SVG masters."

@@ -3,9 +3,9 @@
 set -eu
 
 project_dir=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd -P)
-source_svg="$project_dir/Support/RouteBarAppIcon.svg"
-small_source_svg="$project_dir/Support/RouteBarAppIconSmall.svg"
-output_icns="$project_dir/Support/RouteBar.icns"
+source_svg="$project_dir/docs/brand/routebar-app-icon.svg"
+small_source_svg="$project_dir/docs/brand/routebar-app-icon-small.svg"
+output_icns=${1:-"$project_dir/docs/brand/macos/RouteBar.icns"}
 
 if ! command -v rsvg-convert >/dev/null 2>&1; then
   echo "rsvg-convert is required to build the app icon." >&2

@@ -8,6 +8,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- A public brand kit now keeps the RouteBar mark, outlined lockup, macOS app
+  icon sources, menu bar symbol, palette, and English and Russian usage notes in
+  one documented location.
+
+### Changed
+
+- The READMEs and macOS icon build now use the canonical assets from
+  `docs/brand`, with generated PNG and ICNS derivatives checked for drift; the
+  obsolete pre-0.3.0 development notice has also been removed.
+
 ## [0.3.0] - 2026-09-27
 
 ### Added

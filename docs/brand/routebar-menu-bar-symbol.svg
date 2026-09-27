@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 18 18" role="img" aria-labelledby="title description">
+  <title id="title">RouteBar menu bar symbol</title>
+  <desc id="description">Monochrome small-size RouteBar symbol used in the macOS menu bar.</desc>
+  <g fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="9" cy="9" r="6.75" stroke-width="1.3"/>
+    <g stroke-width="1.5">
+      <path d="M.75 4.5H7.5C7.5 4.5 11 9 17.25 9"/>
+      <path d="M.75 9H7.25C7.25 9 10.75 13.5 17.25 13.5"/>
+      <path d="M.75 13.5H7.5C7.5 13.5 11 4.5 17.25 4.5"/>
+    </g>
+  </g>
+</svg>
