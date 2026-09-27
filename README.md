@@ -107,7 +107,9 @@ and removal are serialized so overlapping operations fail closed.
 Requirements:
 
 - macOS 13 or newer;
-- Swift 6.
+- Swift 6;
+- `librsvg` for regenerating and checking committed brand derivatives
+  (`brew install librsvg`).
 
 Run the complete quality suite and inspect the fictional example plan:
 

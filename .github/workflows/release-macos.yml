@@ -25,6 +25,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install brand asset tools
+        run: brew install librsvg
+
       - name: Validate the release tag and runner
         id: release
         shell: bash

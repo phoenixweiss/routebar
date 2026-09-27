@@ -26,5 +26,8 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install brand asset tools
+        run: brew install librsvg
+
       - name: Run project checks
         run: script/check

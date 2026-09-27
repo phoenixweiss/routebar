@@ -18,7 +18,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - The READMEs and macOS icon build now use the canonical assets from
   `docs/brand`, with generated PNG and ICNS derivatives checked for drift; the
-  obsolete pre-0.3.0 development notice has also been removed.
+  obsolete pre-0.3.0 development notice has also been removed. CI and release
+  runners install the required SVG renderer before running those checks.
 
 ## [0.3.0] - 2026-09-27
 
