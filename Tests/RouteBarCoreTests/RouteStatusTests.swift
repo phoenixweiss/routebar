@@ -15,6 +15,7 @@ final class RouteStatusTests: XCTestCase {
         ssid: "Example Wi-Fi",
         physicalInterface: "en0",
         physicalGateway: "192.0.2.1",
+        physicalAddress: "192.0.2.44",
         vpnInterfaces: ["utun4"]
       ),
       routeGroups: [
@@ -49,11 +50,61 @@ final class RouteStatusTests: XCTestCase {
     XCTAssertEqual(snapshot.groups.first?.targets.map(\.isActive), [true, false])
   }
 
-  private func observed(address: String, gateway: String) -> ObservedRoute {
+  func testReportsRouteBoundToStalePhysicalAddressAsInactive() throws {
+    let address = "203.0.113.10"
+    let plan = RoutePlan(
+      profile: Profile(
+        id: "home",
+        name: "Home",
+        match: ProfileMatch(ssids: ["Example Wi-Fi"]),
+        groups: ["services"]
+      ),
+      network: NetworkSnapshot(
+        ssid: "Example Wi-Fi",
+        physicalInterface: "en0",
+        physicalGateway: "192.0.2.1",
+        physicalAddress: "192.0.2.44"
+      ),
+      routeGroups: [
+        RouteGroupPlan(
+          id: "services",
+          name: "Services",
+          targets: [RouteTarget(address: address, sources: ["portal.example.org"])]
+        )
+      ],
+      checkOnlyGroups: [],
+      profileWasForced: true
+    )
+    let inspector = StatusRouteInspector(routes: [
+      address: observed(
+        address: address,
+        gateway: "192.0.2.1",
+        interfaceAddress: "192.0.2.33"
+      )
+    ])
+    let daemon = StatusDaemonInspector(
+      value: DaemonRuntimeStatus(installed: true, loaded: true, runs: 3, lastExitCode: 0)
+    )
+
+    let snapshot = try RouteStatusService(
+      routeInspector: inspector,
+      daemonInspector: daemon
+    ).snapshot(routePlan: plan)
+
+    XCTAssertEqual(snapshot.activeCount, 0)
+    XCTAssertEqual(snapshot.groups.first?.targets.first?.isActive, false)
+  }
+
+  private func observed(
+    address: String,
+    gateway: String,
+    interfaceAddress: String = "192.0.2.44"
+  ) -> ObservedRoute {
     ObservedRoute(
       destination: address,
       gateway: gateway,
       interface: "en0",
+      interfaceAddress: interfaceAddress,
       flags: ["UP", "GATEWAY", "HOST", "STATIC"]
     )
   }

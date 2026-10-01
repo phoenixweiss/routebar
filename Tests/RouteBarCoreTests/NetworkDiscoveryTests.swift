@@ -43,4 +43,36 @@ final class NetworkDiscoveryTests: XCTestCase {
       XCTAssertTrue(error.localizedDescription.contains("could not find a physical"))
     }
   }
+
+  func testParsesPhysicalInterfaceIPv4Address() throws {
+    let output = """
+      en0: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST> mtu 1500
+          inet 192.0.2.44 netmask 0xffffff00 broadcast 192.0.2.255
+      """
+
+    XCTAssertEqual(try InterfaceAddressParser.ipv4Address(from: output), "192.0.2.44")
+  }
+
+  func testRejectsMissingPhysicalInterfaceIPv4Address() {
+    let output = """
+      en0: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST> mtu 1500
+          inet6 fe80::1%en0 prefixlen 64 secured scopeid 0xb
+      """
+
+    XCTAssertThrowsError(try InterfaceAddressParser.ipv4Address(from: output)) { error in
+      XCTAssertTrue(error.localizedDescription.contains("could not find"))
+    }
+  }
+
+  func testRejectsAmbiguousPhysicalInterfaceIPv4Addresses() {
+    let output = """
+      en0: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST> mtu 1500
+          inet 192.0.2.44 netmask 0xffffff00 broadcast 192.0.2.255
+          inet 198.51.100.44 netmask 0xffffff00 broadcast 198.51.100.255
+      """
+
+    XCTAssertThrowsError(try InterfaceAddressParser.ipv4Address(from: output)) { error in
+      XCTAssertTrue(error.localizedDescription.contains("multiple physical"))
+    }
+  }
 }

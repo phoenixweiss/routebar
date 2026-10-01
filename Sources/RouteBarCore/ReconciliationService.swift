@@ -107,7 +107,12 @@ public struct RouteReconciliationService {
           ))
         try stateStore.save(state)
         try mutator.addHostRoute(address: action.address, gateway: gateway)
-        try verifyOwnedRoute(address: action.address, gateway: gateway, interface: interface)
+        try verifyOwnedRoute(
+          address: action.address,
+          gateway: gateway,
+          interface: interface,
+          interfaceAddress: routePlan.network.physicalAddress
+        )
 
       case .replace:
         guard let oldGateway = action.oldGateway,
@@ -127,7 +132,12 @@ public struct RouteReconciliationService {
           ))
         try stateStore.save(state)
         try mutator.addHostRoute(address: action.address, gateway: newGateway)
-        try verifyOwnedRoute(address: action.address, gateway: newGateway, interface: interface)
+        try verifyOwnedRoute(
+          address: action.address,
+          gateway: newGateway,
+          interface: interface,
+          interfaceAddress: routePlan.network.physicalAddress
+        )
 
       case .remove:
         guard let oldGateway = action.oldGateway else {
@@ -190,11 +200,17 @@ public struct RouteReconciliationService {
     return observations
   }
 
-  private func verifyOwnedRoute(address: String, gateway: String, interface: String) throws {
+  private func verifyOwnedRoute(
+    address: String,
+    gateway: String,
+    interface: String,
+    interfaceAddress: String
+  ) throws {
     let observation = try inspector.route(to: address)
     guard observation.isExplicitStaticHostRoute(for: address),
       observation.gateway == gateway,
-      observation.interface == interface
+      observation.interface == interface,
+      observation.interfaceAddress == interfaceAddress
     else {
       throw ReconciliationError(message: "route verification failed for \(address)")
     }

@@ -21,6 +21,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   obsolete pre-0.3.0 development notice has also been removed. CI and release
   runners install the required SVG renderer before running those checks.
 
+### Fixed
+
+- RouteBar now replaces its `/32` routes when the physical interface receives a
+  different local IPv4 address, even if the new network uses the same gateway
+  address and interface name, preventing stale routes after changing Wi-Fi.
+
 ## [0.3.0] - 2026-09-27
 
 ### Added

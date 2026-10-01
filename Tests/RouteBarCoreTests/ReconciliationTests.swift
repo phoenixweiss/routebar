@@ -6,7 +6,8 @@ final class ReconciliationTests: XCTestCase {
   private let network = NetworkSnapshot(
     ssid: nil,
     physicalInterface: "en0",
-    physicalGateway: "192.0.2.1"
+    physicalGateway: "192.0.2.1",
+    physicalAddress: "192.0.2.44"
   )
 
   func testAddsDesiredAddressWhenOnlyDefaultRouteExists() {
@@ -52,6 +53,51 @@ final class ReconciliationTests: XCTestCase {
     XCTAssertTrue(plan.conflicts.isEmpty)
   }
 
+  func testReplacesOwnedRouteWhenPhysicalAddressChangesBehindSameGateway() {
+    let owned = OwnedRoute(
+      address: "203.0.113.10",
+      gateway: "192.0.2.1",
+      interface: "en0",
+      sources: ["portal.example.org"]
+    )
+    let plan = ReconciliationPlanner.makePlan(
+      desired: [.init(address: owned.address, sources: owned.sources)],
+      network: network,
+      state: RouteState(routes: [owned]),
+      observed: [
+        owned.address: staticRoute(
+          address: owned.address,
+          gateway: owned.gateway,
+          interfaceAddress: "192.0.2.33"
+        )
+      ]
+    )
+
+    XCTAssertEqual(plan.actions.map(\.kind), [.replace])
+    XCTAssertEqual(plan.actions.first?.oldGateway, "192.0.2.1")
+    XCTAssertEqual(plan.actions.first?.newGateway, "192.0.2.1")
+    XCTAssertTrue(plan.conflicts.isEmpty)
+  }
+
+  func testKeepsOwnedRouteWhenFullPhysicalPathIsUnchanged() {
+    let owned = OwnedRoute(
+      address: "203.0.113.10",
+      gateway: "192.0.2.1",
+      interface: "en0",
+      sources: ["portal.example.org"]
+    )
+    let plan = ReconciliationPlanner.makePlan(
+      desired: [.init(address: owned.address, sources: owned.sources)],
+      network: network,
+      state: RouteState(routes: [owned]),
+      observed: [owned.address: staticRoute(address: owned.address, gateway: owned.gateway)]
+    )
+
+    XCTAssertTrue(plan.actions.isEmpty)
+    XCTAssertTrue(plan.conflicts.isEmpty)
+    XCTAssertEqual(plan.unchangedCount, 1)
+  }
+
   func testRemovesOwnedAddressNoLongerReturnedByDNS() {
     let owned = OwnedRoute(
       address: "203.0.113.10",
@@ -64,6 +110,30 @@ final class ReconciliationTests: XCTestCase {
       network: network,
       state: RouteState(routes: [owned]),
       observed: [owned.address: staticRoute(address: owned.address, gateway: owned.gateway)]
+    )
+
+    XCTAssertEqual(plan.actions.map(\.kind), [.remove])
+    XCTAssertTrue(plan.conflicts.isEmpty)
+  }
+
+  func testRemovesOwnedAddressEvenWhenItsInterfaceAddressIsStale() {
+    let owned = OwnedRoute(
+      address: "203.0.113.10",
+      gateway: "192.0.2.1",
+      interface: "en0",
+      sources: ["portal.example.org"]
+    )
+    let plan = ReconciliationPlanner.makePlan(
+      desired: [],
+      network: network,
+      state: RouteState(routes: [owned]),
+      observed: [
+        owned.address: staticRoute(
+          address: owned.address,
+          gateway: owned.gateway,
+          interfaceAddress: "192.0.2.33"
+        )
+      ]
     )
 
     XCTAssertEqual(plan.actions.map(\.kind), [.remove])
@@ -101,6 +171,24 @@ final class ReconciliationTests: XCTestCase {
     XCTAssertEqual(adoption.conflicts.map(\.address), ["203.0.113.20"])
   }
 
+  func testDoesNotAdoptRouteBoundToStalePhysicalAddress() {
+    let address = "203.0.113.10"
+    let adoption = ReconciliationPlanner.adoptableRoutes(
+      desired: [.init(address: address, sources: ["portal.example.org"])],
+      network: network,
+      observed: [
+        address: staticRoute(
+          address: address,
+          gateway: network.physicalGateway,
+          interfaceAddress: "192.0.2.33"
+        )
+      ]
+    )
+
+    XCTAssertTrue(adoption.routes.isEmpty)
+    XCTAssertEqual(adoption.conflicts.map(\.address), [address])
+  }
+
   private func defaultRoute() -> ObservedRoute {
     ObservedRoute(
       destination: "default",
@@ -110,11 +198,16 @@ final class ReconciliationTests: XCTestCase {
     )
   }
 
-  private func staticRoute(address: String, gateway: String) -> ObservedRoute {
+  private func staticRoute(
+    address: String,
+    gateway: String,
+    interfaceAddress: String = "192.0.2.44"
+  ) -> ObservedRoute {
     ObservedRoute(
       destination: address,
       gateway: gateway,
       interface: "en0",
+      interfaceAddress: interfaceAddress,
       flags: ["UP", "GATEWAY", "HOST", "STATIC"]
     )
   }

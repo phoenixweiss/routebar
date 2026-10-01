@@ -94,14 +94,13 @@ public enum ReconciliationPlanner {
       let owned = ownedByAddress[route.address]
 
       if let owned {
-        if matches(
+        if matchesCurrentNetwork(
           current,
           address: route.address,
-          gateway: network.physicalGateway,
-          interface: network.physicalInterface
+          network: network
         ) {
           unchangedCount += 1
-        } else if matches(
+        } else if matchesOwnedState(
           current,
           address: route.address,
           gateway: owned.gateway,
@@ -152,7 +151,7 @@ public enum ReconciliationPlanner {
 
     for owned in state.routes where desiredByAddress[owned.address] == nil {
       let current = observed[owned.address]
-      if matches(
+      if matchesOwnedState(
         current,
         address: owned.address,
         gateway: owned.gateway,
@@ -202,11 +201,10 @@ public enum ReconciliationPlanner {
         current.isExplicitStaticHostRoute(for: route.address)
       else { continue }
 
-      if matches(
+      if matchesCurrentNetwork(
         current,
         address: route.address,
-        gateway: network.physicalGateway,
-        interface: network.physicalInterface
+        network: network
       ) {
         routes.append(
           OwnedRoute(
@@ -219,7 +217,7 @@ public enum ReconciliationPlanner {
         conflicts.append(
           RouteConflict(
             address: route.address,
-            reason: "existing static host route does not use the current physical gateway"
+            reason: "existing static host route does not match the current physical path"
           ))
       }
     }
@@ -239,7 +237,7 @@ public enum ReconciliationPlanner {
 
     for owned in state.routes {
       let current = observed[owned.address]
-      if matches(
+      if matchesOwnedState(
         current,
         address: owned.address,
         gateway: owned.gateway,
@@ -276,7 +274,20 @@ public enum ReconciliationPlanner {
     )
   }
 
-  private static func matches(
+  private static func matchesCurrentNetwork(
+    _ observed: ObservedRoute?,
+    address: String,
+    network: NetworkSnapshot
+  ) -> Bool {
+    matchesOwnedState(
+      observed,
+      address: address,
+      gateway: network.physicalGateway,
+      interface: network.physicalInterface
+    ) && observed?.interfaceAddress == network.physicalAddress
+  }
+
+  private static func matchesOwnedState(
     _ observed: ObservedRoute?,
     address: String,
     gateway: String,

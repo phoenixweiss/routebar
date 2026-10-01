@@ -31,6 +31,38 @@ final class ReconciliationServiceTests: XCTestCase {
     XCTAssertEqual(stateStore.state, result.state)
   }
 
+  func testApplyReplacesRouteWhenPhysicalAddressChangesBehindSameGateway() throws {
+    let address = "203.0.113.10"
+    let owned = OwnedRoute(
+      address: address,
+      gateway: "192.0.2.1",
+      interface: "en0",
+      sources: ["portal.example.org"]
+    )
+    let routeSystem = FakeRouteSystem(routes: [
+      address: observed(
+        address: address,
+        gateway: owned.gateway,
+        interfaceAddress: "192.0.2.33"
+      )
+    ])
+    let stateStore = MemoryRouteStateStore(state: RouteState(routes: [owned]))
+    let service = RouteReconciliationService(
+      inspector: routeSystem,
+      mutator: routeSystem,
+      stateStore: stateStore
+    )
+
+    let result = try service.apply(routePlan: routePlan(address: address))
+
+    XCTAssertEqual(
+      routeSystem.mutations,
+      ["delete \(address) via 192.0.2.1", "add \(address) via 192.0.2.1"]
+    )
+    XCTAssertEqual(routeSystem.routes[address]?.interfaceAddress, "192.0.2.44")
+    XCTAssertEqual(stateStore.state, result.state)
+  }
+
   func testApplyDoesNotMutateWhenAConflictExists() {
     let address = "203.0.113.10"
     let routeSystem = FakeRouteSystem(routes: [
@@ -57,7 +89,11 @@ final class ReconciliationServiceTests: XCTestCase {
       sources: ["portal.example.org"]
     )
     let routeSystem = FakeRouteSystem(routes: [
-      address: observed(address: address, gateway: owned.gateway)
+      address: observed(
+        address: address,
+        gateway: owned.gateway,
+        interfaceAddress: "192.0.2.33"
+      )
     ])
     let stateStore = MemoryRouteStateStore(state: RouteState(routes: [owned]))
     let service = RouteReconciliationService(
@@ -131,7 +167,8 @@ final class ReconciliationServiceTests: XCTestCase {
       network: NetworkSnapshot(
         ssid: nil,
         physicalInterface: "en0",
-        physicalGateway: "192.0.2.1"
+        physicalGateway: "192.0.2.1",
+        physicalAddress: "192.0.2.44"
       ),
       routeGroups: [
         RouteGroupPlan(
@@ -145,11 +182,16 @@ final class ReconciliationServiceTests: XCTestCase {
     )
   }
 
-  private func observed(address: String, gateway: String) -> ObservedRoute {
+  private func observed(
+    address: String,
+    gateway: String,
+    interfaceAddress: String = "192.0.2.44"
+  ) -> ObservedRoute {
     ObservedRoute(
       destination: address,
       gateway: gateway,
       interface: "en0",
+      interfaceAddress: interfaceAddress,
       flags: ["UP", "GATEWAY", "HOST", "STATIC"]
     )
   }
@@ -172,9 +214,11 @@ private final class MemoryRouteStateStore: RouteStateStoring {
 private final class FakeRouteSystem: RouteInspecting, RouteMutating {
   var routes: [String: ObservedRoute]
   var mutations = [String]()
+  let physicalAddress: String
 
-  init(routes: [String: ObservedRoute]) {
+  init(routes: [String: ObservedRoute], physicalAddress: String = "192.0.2.44") {
     self.routes = routes
+    self.physicalAddress = physicalAddress
   }
 
   func route(to address: String) throws -> ObservedRoute {
@@ -193,6 +237,7 @@ private final class FakeRouteSystem: RouteInspecting, RouteMutating {
       destination: address,
       gateway: gateway,
       interface: "en0",
+      interfaceAddress: physicalAddress,
       flags: ["UP", "GATEWAY", "HOST", "STATIC"]
     )
   }

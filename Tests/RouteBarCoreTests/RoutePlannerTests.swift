@@ -7,7 +7,12 @@ final class RoutePlannerTests: XCTestCase {
   func testBuildsDeduplicatedReadOnlyHostRoutePlan() throws {
     let configuration = try loadValidConfiguration()
     let discovery = FakeDiscovery(
-      value: .init(ssid: "Example Wi-Fi", physicalInterface: "en0", physicalGateway: "192.0.2.1")
+      value: .init(
+        ssid: "Example Wi-Fi",
+        physicalInterface: "en0",
+        physicalGateway: "192.0.2.1",
+        physicalAddress: "192.0.2.44"
+      )
     )
     let resolver = FakeResolver(values: [
       "portal.example.org": ["203.0.113.10", "203.0.113.20"]
@@ -32,7 +37,12 @@ final class RoutePlannerTests: XCTestCase {
   func testForcedProfileAllowsPlanWhenSSIDIsUnavailable() throws {
     let configuration = try loadValidConfiguration()
     let discovery = FakeDiscovery(
-      value: .init(ssid: nil, physicalInterface: "en0", physicalGateway: "192.0.2.1")
+      value: .init(
+        ssid: nil,
+        physicalInterface: "en0",
+        physicalGateway: "192.0.2.1",
+        physicalAddress: "192.0.2.44"
+      )
     )
     let resolver = FakeResolver(values: ["portal.example.org": ["203.0.113.20"]])
 
@@ -45,7 +55,12 @@ final class RoutePlannerTests: XCTestCase {
   func testNoMatchingProfileFailsClosed() throws {
     let configuration = try loadValidConfiguration()
     let discovery = FakeDiscovery(
-      value: .init(ssid: "Other Wi-Fi", physicalInterface: "en0", physicalGateway: "192.0.2.1")
+      value: .init(
+        ssid: "Other Wi-Fi",
+        physicalInterface: "en0",
+        physicalGateway: "192.0.2.1",
+        physicalAddress: "192.0.2.44"
+      )
     )
 
     XCTAssertThrowsError(

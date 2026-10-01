@@ -6,17 +6,20 @@ public struct NetworkSnapshot: Sendable, Equatable {
   public let ssid: String?
   public let physicalInterface: String
   public let physicalGateway: String
+  public let physicalAddress: String
   public let vpnInterfaces: [String]
 
   public init(
     ssid: String?,
     physicalInterface: String,
     physicalGateway: String,
+    physicalAddress: String,
     vpnInterfaces: [String] = []
   ) {
     self.ssid = ssid
     self.physicalInterface = physicalInterface
     self.physicalGateway = physicalGateway
+    self.physicalAddress = physicalAddress
     self.vpnInterfaces = vpnInterfaces
   }
 }
@@ -38,12 +41,16 @@ public struct SystemNetworkDiscovery: NetworkDiscovering {
     let routeTable = try run("/usr/sbin/netstat", arguments: ["-rn", "-f", "inet"])
     let gateway = try RouteTableParser.physicalDefaultGateway(from: routeTable)
     let vpnInterfaces = try RouteTableParser.vpnDefaultInterfaces(from: routeTable)
+    let interfaceDetails = try run(
+      "/sbin/ifconfig", arguments: [gateway.interface, "inet"])
+    let physicalAddress = try InterfaceAddressParser.ipv4Address(from: interfaceDetails)
     let ssid = CWWiFiClient.shared().interface(withName: gateway.interface)?.ssid()
 
     return NetworkSnapshot(
       ssid: ssid,
       physicalInterface: gateway.interface,
       physicalGateway: gateway.address,
+      physicalAddress: physicalAddress,
       vpnInterfaces: vpnInterfaces
     )
   }
@@ -78,6 +85,33 @@ public struct SystemNetworkDiscovery: NetworkDiscovering {
       throw NetworkDiscoveryError(message: "\(executable) returned non-UTF-8 output")
     }
     return text
+  }
+}
+
+public enum InterfaceAddressParser {
+  public static func ipv4Address(from output: String) throws -> String {
+    let addresses = output.split(whereSeparator: \.isNewline).compactMap { line -> String? in
+      let columns = line.split(whereSeparator: \.isWhitespace).map(String.init)
+      guard columns.count >= 2, columns[0] == "inet", isIPv4(columns[1]) else { return nil }
+      return columns[1]
+    }
+    let unique = Array(Set(addresses)).sorted()
+
+    guard unique.count == 1, let address = unique.first else {
+      if unique.isEmpty {
+        throw NetworkDiscoveryError(message: "could not find the physical interface IPv4 address")
+      }
+      let addressesList = unique.joined(separator: ", ")
+      throw NetworkDiscoveryError(
+        message: "multiple physical interface IPv4 addresses found: \(addressesList)"
+      )
+    }
+    return address
+  }
+
+  private static func isIPv4(_ value: String) -> Bool {
+    var address = in_addr()
+    return value.withCString { inet_pton(AF_INET, $0, &address) } == 1
   }
 }
 

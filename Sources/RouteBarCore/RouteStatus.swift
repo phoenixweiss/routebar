@@ -97,7 +97,8 @@ public struct RouteStatusService {
             sources: target.sources,
             isActive: route?.isExplicitStaticHostRoute(for: target.address) == true
               && route?.gateway == routePlan.network.physicalGateway
-              && route?.interface == routePlan.network.physicalInterface,
+              && route?.interface == routePlan.network.physicalInterface
+              && route?.interfaceAddress == routePlan.network.physicalAddress,
             observedGateway: route?.gateway,
             observedInterface: route?.interface
           )

@@ -315,6 +315,7 @@ private struct FixedRoutePlanner: RoutePlanning {
         ssid: "Office",
         physicalInterface: "en0",
         physicalGateway: "192.0.2.1",
+        physicalAddress: "192.0.2.44",
         vpnInterfaces: ["utun4"]
       ),
       routeGroups: [

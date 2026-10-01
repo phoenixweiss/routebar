@@ -392,6 +392,7 @@ final class BundledDaemonRegistrationTests: XCTestCase {
         ssid: "Sample Wi-Fi",
         physicalInterface: "en0",
         physicalGateway: "192.0.2.1",
+        physicalAddress: "192.0.2.44",
         vpnInterfaces: ["utun4"]
       ),
       groups: [],

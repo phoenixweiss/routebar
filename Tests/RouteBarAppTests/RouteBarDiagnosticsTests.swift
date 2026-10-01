@@ -17,6 +17,7 @@ final class RouteBarDiagnosticsTests: XCTestCase {
         ssid: "Private Wi-Fi",
         physicalInterface: "en0",
         physicalGateway: "192.0.2.1",
+        physicalAddress: "192.0.2.44",
         vpnInterfaces: ["utun4"]
       ),
       groups: [
@@ -80,6 +81,7 @@ final class RouteBarDiagnosticsTests: XCTestCase {
     for sensitiveValue in [
       "secret.example",
       "192.0.2.1",
+      "192.0.2.44",
       "192.0.2.10",
       "Private Wi-Fi",
       "Secret Office",

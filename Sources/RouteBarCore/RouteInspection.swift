@@ -1,20 +1,24 @@
+import Darwin
 import Foundation
 
 public struct ObservedRoute: Sendable, Equatable {
   public let destination: String
   public let gateway: String?
   public let interface: String?
+  public let interfaceAddress: String?
   public let flags: Set<String>
 
   public init(
     destination: String,
     gateway: String?,
     interface: String?,
+    interfaceAddress: String? = nil,
     flags: Set<String>
   ) {
     self.destination = destination
     self.gateway = gateway
     self.interface = interface
+    self.interfaceAddress = interfaceAddress
     self.flags = flags
   }
 
@@ -57,8 +61,32 @@ public enum RouteGetParser {
       destination: destination,
       gateway: values["gateway"],
       interface: values["interface"],
+      interfaceAddress: interfaceAddress(from: output),
       flags: flags
     )
+  }
+
+  private static func interfaceAddress(from output: String) -> String? {
+    let lines = output.split(whereSeparator: \.isNewline).map(String.init)
+    guard
+      let sockaddrsIndex = lines.lastIndex(where: { line in
+        let columns = line.split(whereSeparator: \.isWhitespace).map(String.init)
+        return columns.first == "sockaddrs:" && line.contains("IFA")
+      }),
+      sockaddrsIndex + 1 < lines.count
+    else {
+      return nil
+    }
+
+    return lines[sockaddrsIndex + 1]
+      .split(whereSeparator: \.isWhitespace)
+      .map(String.init)
+      .last(where: isIPv4)
+  }
+
+  private static func isIPv4(_ value: String) -> Bool {
+    var address = in_addr()
+    return value.withCString { inet_pton(AF_INET, $0, &address) } == 1
   }
 }
 
@@ -66,7 +94,7 @@ public struct SystemRouteInspector: RouteInspecting {
   public init() {}
 
   public func route(to address: String) throws -> ObservedRoute {
-    let result = try FixedCommand.run("/sbin/route", arguments: ["-n", "get", address])
+    let result = try FixedCommand.run("/sbin/route", arguments: ["-n", "-v", "get", address])
     guard result.status == 0 else {
       throw RouteInspectionError(message: "could not inspect route to \(address)")
     }
