@@ -81,11 +81,87 @@ Schema version 1 supports two group modes:
 
 - `bypass-vpn` — domains and optional fixed IPv4 addresses that produce `/32`
   routes;
-- `check-only` — connectivity endpoints that never produce routes.
+- `check-only` — transport endpoints and/or HTTPS `checks` that never produce routes.
 
 The current route engine is IPv4-only. A records are refreshed and deduplicated;
-AAAA records are ignored. HTTPS, TCP, TLS, and STARTTLS checks are represented by
-the schema but are not executed by the app yet.
+AAAA records are ignored. The app's **Connectivity** section runs configured checks
+only when you click **Check**. Each endpoint has its own TCP, TLS, SMTP STARTTLS or
+HTTPS result, separate from host-route status. Checks use current system routes,
+never apply routing rules, authenticate or run on a timer. Results are manual
+snapshots; changes to the detected network, profile or check configuration mark
+them out of date. HTTPS rows show the host only, not URL paths or query strings.
+Before each connection, RouteBar resolves the destination and asks the kernel for
+the source address selected by current routing. It binds that address for this
+check only, avoiding stale macOS path addresses after DHCP or network changes.
+No interface or gateway is pinned; IPv4 is preferred when available so `/32`
+exceptions remain effective. The selected address is not saved between checks.
+The development CLI can check TCP transport for every `check-only` endpoint:
+
+```sh
+swift run routebar check-tcp --config ~/.config/routebar/config.yaml --profile home
+```
+
+This opens and closes connections using the current system routing, without
+changing routes, authenticating or sending application data. Each endpoint gets
+a separate result: reachable, DNS failure, refused, unreachable, timeout or failed.
+Exit code `5` means at least one endpoint was not reachable. With a single profile,
+`--profile` can be omitted. Endpoints accept `protocol: tcp` and an optional
+`timeout_seconds` (0.1–30, default 5); the deadline includes DNS resolution.
+For `tls` and `starttls-smtp` endpoints this command checks **TCP only**, not
+certificates or protocol handshakes.
+
+To check implicit TLS endpoints (`protocol: tls`):
+
+```sh
+swift run routebar check-tls --config ~/.config/routebar/config.yaml --profile home
+```
+
+This performs a TLS 1.2-or-newer handshake with macOS certificate trust and
+hostname validation, without authenticating or sending application data. The
+same endpoint deadline covers DNS, connection and handshake. Certificate failures
+are reported separately from TLS handshake errors and transport failures; exit
+code `5` means at least one check failed. Only implicit TLS endpoints are checked:
+plain TCP and STARTTLS endpoints are skipped. There is no insecure certificate
+bypass. Trust evaluation does not fetch missing certificates or revocation data
+over the network, so this is not a full online revocation audit.
+
+For SMTP STARTTLS endpoints (`protocol: starttls-smtp`):
+
+```sh
+swift run routebar check-starttls --config ~/.config/routebar/config.yaml --profile home
+```
+
+This checks the SMTP greeting, EHLO capabilities and STARTTLS response, then
+upgrades the same connection to verified TLS 1.2 or newer. Only
+`EHLO routebar.invalid` and `STARTTLS` are sent; there is no AUTH, mail or plaintext
+fallback. One endpoint deadline covers the entire check. Missing STARTTLS,
+rejected upgrades and malformed SMTP replies have separate results, alongside
+the TLS and transport errors above. Replies are size-limited and are not logged
+or saved. Exit code `5` means at least one check failed. Other endpoint protocols
+are skipped. The same certificate-validation limitations as `check-tls` apply.
+
+To check HTTPS URLs from `checks` in either group mode:
+
+```sh
+swift run routebar check-https --config ~/.config/routebar/config.yaml --profile home
+```
+
+This sends **HEAD**, checks the initial HTTP status against `expected_statuses`
+and stops at response headers without collecting the body. It uses verified system
+TLS with an HTTP/1.1 request and bounded headers (16 KiB), not a browser session.
+Informational responses are skipped; malformed headers have their own error.
+It uses current system routing: it does not create routes or apply a bypass
+group's route plan. Redirects
+are not followed (an expected `302` is reported as `302`), cookies and credentials
+are disabled, and URLs with embedded credentials or fragments are rejected.
+There is no GET fallback if HEAD is unsupported. Each check accepts optional
+`timeout_seconds` (0.1–30, default 5) for the whole request. Certificate, TLS, DNS,
+connection, timeout and unexpected-status results are separate; the HTTP status
+is included where available. Exit code `5` means at least one check failed.
+Certificate validation has the same offline limitations as `check-tls`.
+The fictional example includes a HTTPS-only `check-only` group.
+The app selects the configured transport for each endpoint; unlike `check-tcp`,
+it performs TLS or SMTP STARTTLS when that is the endpoint's protocol.
 
 Profiles currently require an explicit selection for the bundled service.
 Automatic switching by Wi-Fi name remains disabled until SSID access and unknown
@@ -96,6 +172,13 @@ network behavior can be verified without weakening the fail-closed model.
 RouteBar never broadens an exception to a subnet and never changes the default
 route. Before every reconciliation it rediscovers the physical gateway, resolves
 DNS, and compares the desired plan with routes previously recorded as its own.
+
+Domain entries are exact hostnames: a root domain does not include its subdomains
+or a separate CDN hostname. A DNS failure skips only that hostname; other resolved
+domains and fixed addresses continue to reconcile. The window and read-only plan
+show unresolved domains. Previously owned IPs that are no longer desired are
+removed through the normal ownership checks, not reused as DNS fallback. Resolution
+is retried on the next reconciliation; no alternate DNS server is queried automatically.
 
 An existing route can be adopted only when it exactly matches the current
 physical gateway. Cleanup removes a route only while it still matches the

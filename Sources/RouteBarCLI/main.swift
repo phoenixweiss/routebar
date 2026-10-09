@@ -37,6 +37,10 @@ private let help = """
   Usage:
     routebar validate [--config PATH]
     routebar plan [--config PATH] [--profile ID]
+    routebar check-tcp [--config PATH] [--profile ID]
+    routebar check-tls [--config PATH] [--profile ID]
+    routebar check-starttls [--config PATH] [--profile ID]
+    routebar check-https [--config PATH] [--profile ID]
     routebar reconcile [--config PATH] [--profile ID]
                        [--apply | --adopt-existing] [--quiet]
     routebar cleanup [--apply] [--quiet]
@@ -47,6 +51,16 @@ private let help = """
   RouteBar's state are replaced or removed.
   Default configuration: ~/.config/routebar/config.yaml
   Default state: /var/db/routebar/state.json
+  check-tcp opens connections without changing routes or sending application data.
+  It checks TCP only, not TLS, STARTTLS or authentication. With multiple profiles,
+  --profile is required. Exit code 5 means at least one endpoint was not reachable.
+  check-tls checks only implicit TLS endpoints, including certificates and hostname.
+  It does not check STARTTLS or authenticate. Exit code 5 means a failed check.
+  check-starttls checks SMTP STARTTLS, including certificate and hostname, without
+  AUTH or mail. It requires advertised STARTTLS and never falls back to plaintext.
+  check-https checks configured expected statuses with HEAD, stopping at headers.
+  It does not follow redirects, store cookies or authenticate. Exit code 5 means
+  at least one failed check. Multiple profiles require --profile.
   """
 
 private func parseOptions(
@@ -147,6 +161,102 @@ do {
     } catch {
       configurationError(error, path: options.configURL)
     }
+
+  case "check-tcp":
+    let options = try parseOptions(arguments.dropFirst(), allowProfile: true)
+    let configuration: RouteBarConfiguration
+    do {
+      configuration = try ConfigurationLoader.load(from: options.configURL)
+    } catch {
+      configurationError(error, path: options.configURL)
+    }
+    guard
+      let profileID = options.profileID
+        ?? (configuration.profiles.count == 1 ? configuration.profiles.first?.id : nil)
+    else {
+      throw CLIError.usage("check-tcp requires --profile when multiple profiles are configured")
+    }
+    let results: [TCPCheckResult]
+    do {
+      results = try TCPCheckService().check(configuration: configuration, profileID: profileID)
+    } catch {
+      operationError(error, label: "TCP check", quiet: false)
+    }
+    print("TCP transport only; TLS, STARTTLS and authentication are not checked.")
+    if results.isEmpty { print("No check-only endpoints in the selected profile.") }
+    for result in results {
+      print("[\(result.groupID)] \(result.endpoint.name): \(result.outcome.rawValue)")
+    }
+    if results.contains(where: { $0.outcome != .reachable }) { exit(5) }
+
+  case "check-tls", "check-starttls":
+    let options = try parseOptions(arguments.dropFirst(), allowProfile: true)
+    let configuration: RouteBarConfiguration
+    do {
+      configuration = try ConfigurationLoader.load(from: options.configURL)
+    } catch {
+      configurationError(error, path: options.configURL)
+    }
+    guard
+      let profileID = options.profileID
+        ?? (configuration.profiles.count == 1 ? configuration.profiles.first?.id : nil)
+    else {
+      throw CLIError.usage("\(command) requires --profile when multiple profiles are configured")
+    }
+    do {
+      if command == "check-tls" {
+        let results = try TLSCheckService().check(
+          configuration: configuration, profileID: profileID)
+        print("Implicit TLS only; STARTTLS and authentication are not checked.")
+        if results.isEmpty {
+          print("No implicit TLS check-only endpoints in the selected profile.")
+        }
+        for result in results {
+          print("[\(result.groupID)] \(result.endpoint.name): \(result.outcome.rawValue)")
+        }
+        if results.contains(where: { $0.outcome != .reachable }) { exit(5) }
+      } else {
+        let results = try SMTPStartTLSCheckService().check(
+          configuration: configuration, profileID: profileID)
+        print("SMTP STARTTLS only; no authentication or mail is sent.")
+        if results.isEmpty {
+          print("No SMTP STARTTLS check-only endpoints in the selected profile.")
+        }
+        for result in results {
+          print("[\(result.groupID)] \(result.endpoint.name): \(result.outcome.rawValue)")
+        }
+        if results.contains(where: { $0.outcome != .reachable }) { exit(5) }
+      }
+    } catch {
+      operationError(
+        error, label: command == "check-tls" ? "TLS check" : "SMTP STARTTLS check", quiet: false)
+    }
+
+  case "check-https":
+    let options = try parseOptions(arguments.dropFirst(), allowProfile: true)
+    let configuration: RouteBarConfiguration
+    do { configuration = try ConfigurationLoader.load(from: options.configURL) } catch {
+      configurationError(error, path: options.configURL)
+    }
+    guard
+      let profileID = options.profileID
+        ?? (configuration.profiles.count == 1 ? configuration.profiles.first?.id : nil)
+    else {
+      throw CLIError.usage("check-https requires --profile when multiple profiles are configured")
+    }
+    do {
+      let results = try HTTPSCheckService().check(
+        configuration: configuration, profileID: profileID)
+      print("HTTPS response headers only; no redirects, authentication or route changes.")
+      if results.isEmpty { print("No HTTPS checks in the selected profile.") }
+      for (index, result) in results.enumerated() {
+        let status = result.result.statusCode.map { " (HTTP \($0))" } ?? ""
+        print(
+          "[\(result.groupID)] HTTPS check \(index + 1): \(result.result.outcome.rawValue)\(status)"
+        )
+      }
+      if results.contains(where: { $0.result.outcome != .reachable }) { exit(5) }
+    } catch { operationError(error, label: "HTTPS check", quiet: false) }
 
   case "plan":
     let options = try parseOptions(arguments.dropFirst(), allowProfile: true)

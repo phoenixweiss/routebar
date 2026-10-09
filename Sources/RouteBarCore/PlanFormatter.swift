@@ -20,6 +20,9 @@ public enum PlanFormatter {
       lines.append("Routes:")
       for group in plan.routeGroups {
         lines.append("  \(group.name) (\(group.id))")
+        for domain in group.unresolvedDomains {
+          lines.append("    ! \(domain): DNS resolution failed; bypass unavailable")
+        }
         for target in group.targets {
           lines.append(
             "    + \(target.address)/32 via \(plan.network.physicalGateway) "

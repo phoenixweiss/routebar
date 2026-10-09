@@ -31,18 +31,25 @@ public struct RouteGroupStatus: Sendable, Equatable, Identifiable {
   public let groupID: String
   public let name: String
   public let targets: [RouteTargetStatus]
+  public let unresolvedDomains: [String]
 
-  public init(groupID: String, name: String, targets: [RouteTargetStatus]) {
+  public init(
+    groupID: String, name: String, targets: [RouteTargetStatus], unresolvedDomains: [String] = []
+  ) {
     self.groupID = groupID
     self.name = name
     self.targets = targets
+    self.unresolvedDomains = unresolvedDomains
   }
 }
 
 public struct RouteStatusSnapshot: Sendable, Equatable {
   public var routeCount: Int { groups.reduce(0) { $0 + $1.targets.count } }
   public var activeCount: Int { groups.reduce(0) { $0 + $1.activeCount } }
-  public var allRoutesActive: Bool { routeCount > 0 && routeCount == activeCount }
+  public var allRoutesActive: Bool {
+    routeCount > 0 && routeCount == activeCount
+      && groups.allSatisfy { $0.unresolvedDomains.isEmpty }
+  }
 
   public let profile: Profile
   public let network: NetworkSnapshot
@@ -102,7 +109,8 @@ public struct RouteStatusService {
             observedGateway: route?.gateway,
             observedInterface: route?.interface
           )
-        }
+        },
+        unresolvedDomains: group.unresolvedDomains
       )
     }
 

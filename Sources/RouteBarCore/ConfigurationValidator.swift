@@ -82,12 +82,14 @@ public enum ConfigurationValidator {
         "check-only group \(group.id) must not contain addresses"
       )
       try require(
-        !group.suppliedFields.contains("checks"),
-        "check-only group \(group.id) must not contain route checks"
-      )
-      try require(
-        !group.endpoints.isEmpty, "check-only group \(group.id).endpoints must not be empty")
+        !group.endpoints.isEmpty || !group.checks.isEmpty,
+        "check-only group \(group.id) must contain at least one endpoint or HTTPS check")
+      for check in group.checks { try validateCheck(check, groupID: group.id) }
       for endpoint in group.endpoints {
+        try require(
+          endpoint.timeoutSeconds.isFinite && (0.1...30).contains(endpoint.timeoutSeconds),
+          "group \(group.id).endpoint.timeout_seconds must be between 0.1 and 30"
+        )
         try validateNonEmpty(endpoint.name, at: "group \(group.id).endpoint.name")
         try validateHostname(endpoint.host, at: "group \(group.id).endpoint.host")
         try require(
@@ -99,12 +101,12 @@ public enum ConfigurationValidator {
   }
 
   private static func validateCheck(_ check: HTTPSCheck, groupID: String) throws {
-    guard let components = URLComponents(string: check.url),
-      components.scheme?.lowercased() == "https",
-      components.host != nil
-    else {
-      throw error("group \(groupID) check URL must use HTTPS")
+    guard safeHTTPSURL(check.url) != nil else {
+      throw error("group \(groupID) check URL must use HTTPS without credentials or fragment")
     }
+    try require(
+      check.timeoutSeconds.isFinite && (0.1...30).contains(check.timeoutSeconds),
+      "group \(groupID) check timeout_seconds must be between 0.1 and 30")
     try require(
       !check.expectedStatuses.isEmpty,
       "group \(groupID) check expected_statuses must not be empty"
@@ -116,6 +118,15 @@ public enum ConfigurationValidator {
         "group \(groupID) expected status must be between 100 and 599"
       )
     }
+  }
+
+  static func safeHTTPSURL(_ value: String) -> URL? {
+    guard let components = URLComponents(string: value), components.scheme?.lowercased() == "https",
+      let host = components.host, !host.isEmpty, components.user == nil, components.password == nil,
+      components.fragment == nil, components.port == nil || (1...65_535).contains(components.port!),
+      value == value.trimmingCharacters(in: .whitespacesAndNewlines)
+    else { return nil }
+    return components.url
   }
 
   private static func validateIdentifier(_ value: String, at location: String) throws {

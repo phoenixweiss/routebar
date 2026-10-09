@@ -12,6 +12,7 @@ profiles:
       - work
       - library
       - mail
+      - status
 
 groups:
   - id: work
@@ -45,6 +46,8 @@ groups:
         host: smtp.example.net
         port: 465
         protocol: tls
+        # Optional TCP deadline, including DNS; default: 5, allowed: 0.1–30.
+        timeout_seconds: 5
       - name: SMTP with STARTTLS
         host: smtp.example.net
         port: 587
@@ -53,3 +56,12 @@ groups:
         host: imap.example.net
         port: 993
         protocol: tls
+
+  - id: status
+    name: Web status (checks only)
+    mode: check-only
+    checks:
+      - type: https
+        url: https://status.example.org/health
+        expected_statuses: [200, 204]
+        timeout_seconds: 5

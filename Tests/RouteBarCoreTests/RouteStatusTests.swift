@@ -3,6 +3,28 @@ import XCTest
 @testable import RouteBarCore
 
 final class RouteStatusTests: XCTestCase {
+  func testSnapshotPropagatesUnresolvedDomains() throws {
+    let plan = RoutePlan(
+      profile: Profile(
+        id: "home", name: "Home",
+        match: ProfileMatch(ssids: ["Example Wi-Fi"]), groups: ["web"]),
+      network: NetworkSnapshot(
+        ssid: "Example Wi-Fi", physicalInterface: "en0",
+        physicalGateway: "192.0.2.1", physicalAddress: "192.0.2.44"),
+      routeGroups: [
+        RouteGroupPlan(
+          id: "web", name: "Web", targets: [], unresolvedDomains: ["broken.example.org"])
+      ],
+      checkOnlyGroups: [], profileWasForced: true)
+    let snapshot = try RouteStatusService(
+      routeInspector: StatusRouteInspector(routes: [:]),
+      daemonInspector: StatusDaemonInspector(
+        value: DaemonRuntimeStatus(installed: true, loaded: true))
+    )
+    .snapshot(routePlan: plan)
+    XCTAssertEqual(snapshot.groups[0].unresolvedDomains, ["broken.example.org"])
+    XCTAssertFalse(snapshot.allRoutesActive)
+  }
   func testReportsOnlyRoutesThroughCurrentPhysicalGatewayAsActive() throws {
     let plan = RoutePlan(
       profile: Profile(

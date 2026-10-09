@@ -85,6 +85,7 @@ private enum LaunchAtLoginAttempt: Sendable {
 
 @MainActor
 final class RouteBarAppModel: ObservableObject {
+  let connectivity = ConnectivityModel()
   @Published private(set) var state: RouteBarAppState = .loading
   @Published private(set) var isRefreshing = false
   @Published private(set) var bundledDaemonStatus: BundledDaemonServiceStatus = .checking
@@ -352,13 +353,30 @@ final class RouteBarAppModel: ObservableObject {
           checkedAt: checkedAt
         ))
     }
+    await prepareConnectivity()
     isRefreshing = false
+  }
+
+  private func prepareConnectivity() async {
+    guard case .ready(let snapshot, let configURL) = state else {
+      connectivity.invalidate()
+      return
+    }
+    await connectivity.prepare(
+      configURL: configURL, profileID: snapshot.profile.id, network: snapshot.network)
+  }
+
+  func checkConnectivity() async {
+    guard !isRefreshing, !connectivity.isChecking else { return }
+    await prepareConnectivity()
+    await connectivity.run()
   }
 
   func selectProfile(_ profileID: String) {
     guard profileOptions.contains(where: { $0.id == profileID }) else { return }
     guard selectedProfileID != profileID else { return }
     selectedProfileID = profileID
+    connectivity.invalidate()
     configurationReloadState = .idle
     Task { await refresh() }
   }

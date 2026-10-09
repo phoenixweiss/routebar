@@ -204,6 +204,12 @@ struct RouteBarStatusView: View {
           sectionDivider
           routesSection(snapshot)
           sectionDivider
+          ConnectivityView(
+            model: model.connectivity,
+            check: {
+              Task { await model.checkConnectivity() }
+            }, canCheck: !model.isRefreshing)
+          sectionDivider
           daemonSection(snapshot.daemon)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -287,7 +293,7 @@ struct RouteBarStatusView: View {
   }
 
   private func routeGroup(_ group: RouteGroupStatus) -> some View {
-    let active = group.activeCount == group.targets.count
+    let active = group.activeCount == group.targets.count && group.unresolvedDomains.isEmpty
 
     return VStack(alignment: .leading, spacing: 5) {
       HStack(spacing: 10) {
@@ -314,6 +320,15 @@ struct RouteBarStatusView: View {
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
         .padding(.leading, 28)
+
+      ForEach(group.unresolvedDomains, id: \.self) { domain in
+        Label(
+          "\(domain): DNS unavailable · bypass not applied", systemImage: "exclamationmark.triangle"
+        )
+        .font(routeBarFont(13.5))
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.leading, 28)
+      }
 
       ForEach(group.targets.filter { !$0.isActive }.prefix(3)) { target in
         Text(routeProblem(target))
@@ -1151,7 +1166,9 @@ struct RouteBarStatusView: View {
 
   private func sourceSummary(_ group: RouteGroupStatus) -> String {
     let sources = Set(group.targets.flatMap(\.sources).filter { $0 != "fixed address" }).sorted()
-    return sources.isEmpty ? "Fixed addresses" : sources.joined(separator: ", ")
+    return sources.isEmpty
+      ? (group.targets.isEmpty ? "No resolved routes" : "Fixed addresses")
+      : sources.joined(separator: ", ")
   }
 
   private func routeProblem(_ target: RouteTargetStatus) -> String {

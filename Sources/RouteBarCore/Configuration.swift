@@ -114,11 +114,13 @@ public struct HTTPSCheck: Decodable, Sendable, Equatable {
   public let type: CheckType
   public let url: String
   public let expectedStatuses: [Int]
+  public let timeoutSeconds: Double
 
   enum CodingKeys: String, CodingKey, CaseIterable {
     case type
     case url
     case expectedStatuses = "expected_statuses"
+    case timeoutSeconds = "timeout_seconds"
   }
 
   public init(from decoder: Decoder) throws {
@@ -127,6 +129,14 @@ public struct HTTPSCheck: Decodable, Sendable, Equatable {
     type = try container.decode(CheckType.self, forKey: .type)
     url = try container.decode(String.self, forKey: .url)
     expectedStatuses = try container.decode([Int].self, forKey: .expectedStatuses)
+    timeoutSeconds = try container.decodeIfPresent(Double.self, forKey: .timeoutSeconds) ?? 5
+  }
+
+  public init(url: String, expectedStatuses: [Int], timeoutSeconds: Double = 5) {
+    type = .https
+    self.url = url
+    self.expectedStatuses = expectedStatuses
+    self.timeoutSeconds = timeoutSeconds
   }
 }
 
@@ -139,12 +149,14 @@ public struct Endpoint: Decodable, Sendable, Equatable {
   public let host: String
   public let port: Int
   public let `protocol`: EndpointProtocol
+  public let timeoutSeconds: Double
 
   enum CodingKeys: String, CodingKey, CaseIterable {
     case name
     case host
     case port
     case `protocol`
+    case timeoutSeconds = "timeout_seconds"
   }
 
   public init(from decoder: Decoder) throws {
@@ -154,10 +166,23 @@ public struct Endpoint: Decodable, Sendable, Equatable {
     host = try container.decode(String.self, forKey: .host)
     port = try container.decode(Int.self, forKey: .port)
     `protocol` = try container.decode(EndpointProtocol.self, forKey: .protocol)
+    timeoutSeconds = try container.decodeIfPresent(Double.self, forKey: .timeoutSeconds) ?? 5
+  }
+
+  public init(
+    name: String, host: String, port: Int, protocol: EndpointProtocol,
+    timeoutSeconds: Double = 5
+  ) {
+    self.name = name
+    self.host = host
+    self.port = port
+    self.protocol = `protocol`
+    self.timeoutSeconds = timeoutSeconds
   }
 }
 
 public enum EndpointProtocol: String, Decodable, Sendable, Equatable {
+  case tcp
   case tls
   case startTLSSMTP = "starttls-smtp"
 }

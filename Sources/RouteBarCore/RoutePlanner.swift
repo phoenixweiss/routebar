@@ -33,11 +33,13 @@ public struct RouteGroupPlan: Sendable, Equatable {
   public let id: String
   public let name: String
   public let targets: [RouteTarget]
+  public let unresolvedDomains: [String]
 
-  public init(id: String, name: String, targets: [RouteTarget]) {
+  public init(id: String, name: String, targets: [RouteTarget], unresolvedDomains: [String] = []) {
     self.id = id
     self.name = name
     self.targets = targets
+    self.unresolvedDomains = unresolvedDomains
   }
 }
 
@@ -91,12 +93,19 @@ public struct RoutePlanner: RoutePlanning {
         checkOnlyGroups.append(group)
       case .bypassVPN:
         var sourcesByAddress = [String: Set<String>]()
+        var unresolvedDomains = [String]()
         for address in group.addresses {
           sourcesByAddress[address, default: []].insert("fixed address")
         }
         for domain in group.domains {
-          for address in try resolver.resolveIPv4(hostname: domain) {
-            sourcesByAddress[address, default: []].insert(domain)
+          do {
+            let addresses = try resolver.resolveIPv4(hostname: domain)
+            if addresses.isEmpty { unresolvedDomains.append(domain) }
+            for address in addresses {
+              sourcesByAddress[address, default: []].insert(domain)
+            }
+          } catch is DNSResolutionError {
+            unresolvedDomains.append(domain)
           }
         }
         let targets = sourcesByAddress.map { address, sources in
@@ -104,7 +113,10 @@ public struct RoutePlanner: RoutePlanning {
         }.sorted {
           ipv4Components($0.address).lexicographicallyPrecedes(ipv4Components($1.address))
         }
-        routeGroups.append(RouteGroupPlan(id: group.id, name: group.name, targets: targets))
+        routeGroups.append(
+          RouteGroupPlan(
+            id: group.id, name: group.name, targets: targets,
+            unresolvedDomains: unresolvedDomains))
       }
     }
 

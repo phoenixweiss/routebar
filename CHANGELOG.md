@@ -8,6 +8,44 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- A DNS failure for one bypass domain no longer blocks reconciliation of healthy
+  domains and fixed addresses. Unresolved domains are shown in the route group
+  and read-only plan; obsolete owned routes are removed rather than reusing stale IPs.
+- Connectivity checks select a fresh kernel-routed source address for every
+  connection instead of reusing stale macOS path addresses after a DHCP or network
+  change. DNS, source selection, TLS and protocol work share one deadline.
+- HTTPS checks use the same source-aware verified TLS transport, with bounded
+  HTTP/1.1 HEAD response headers, instead of a URLSession path that can retain an
+  obsolete local address. Malformed HTTP replies are reported separately.
+
+### Added
+
+- A manual Connectivity section reports each configured TCP, TLS, SMTP STARTTLS
+  and HTTPS check separately from route status, without blocking the interface,
+  changing routes, activating windows or running checks on a timer. Results are
+  marked out of date after detected network, profile or check configuration changes.
+- A read-only `check-tcp` development command reports TCP connectivity for each
+  check-only endpoint without changing routes or sending application data. This
+  command checks TCP transport only, not TLS or STARTTLS handshakes.
+- Endpoint configuration supports plain `tcp` and optional `timeout_seconds`
+  (0.1–30 seconds, default 5), covering DNS and connection establishment.
+- A read-only `check-tls` development command validates implicit TLS handshakes,
+  certificate trust and server hostname with one endpoint deadline, without
+  authentication or application data. Certificate and handshake failures are
+  reported separately; STARTTLS endpoints are not checked by this command.
+- A read-only `check-starttls` development command checks SMTP greeting, EHLO,
+  advertised STARTTLS and the verified TLS upgrade on the same connection with
+  one deadline. Missing support, rejected upgrades and malformed replies are
+  distinct failures. No authentication, mail or plaintext fallback is performed.
+- A read-only `check-https` development command checks expected HTTP statuses
+  with HEAD, verified TLS and a single deadline. It does not follow redirects,
+  reuse cookies, authenticate, collect response bodies or change routes.
+- Check-only groups can contain HTTPS `checks`, transport endpoints or both.
+  HTTPS checks support optional `timeout_seconds` (default 5). Existing bypass
+  group checks remain supported; URLs with credentials or fragments are rejected.
+
 ## [0.3.1] - 2026-10-01
 
 ### Added

@@ -4,6 +4,67 @@ import XCTest
 @testable import RouteBarCore
 
 final class RoutePlannerTests: XCTestCase {
+  func testOneFailedDomainDoesNotBlockHealthyDomain() throws {
+    let configuration = try ConfigurationLoader.load(
+      source: validConfiguration.replacingOccurrences(
+        of: "domains: [portal.example.org]",
+        with: "domains: [broken.example.org, portal.example.org]"))
+    let discovery = FakeDiscovery(
+      value: .init(
+        ssid: "Example Wi-Fi", physicalInterface: "en0",
+        physicalGateway: "192.0.2.1", physicalAddress: "192.0.2.44"))
+    let plan = try RoutePlanner(
+      discovery: discovery,
+      resolver: FakeResolver(values: ["portal.example.org": ["203.0.113.20"]])
+    )
+    .plan(configuration: configuration)
+    XCTAssertEqual(plan.routeGroups[0].unresolvedDomains, ["broken.example.org"])
+    XCTAssertEqual(plan.routeGroups[0].targets.map(\.address), ["203.0.113.10", "203.0.113.20"])
+  }
+  func testDNSFailureDoesNotBlockFixedAddressesAndRecovers() throws {
+    let configuration = try loadValidConfiguration()
+    let discovery = FakeDiscovery(
+      value: .init(
+        ssid: "Example Wi-Fi", physicalInterface: "en0",
+        physicalGateway: "192.0.2.1", physicalAddress: "192.0.2.44"))
+    let plan = try RoutePlanner(discovery: discovery, resolver: FakeResolver(values: [:]))
+      .plan(configuration: configuration)
+    XCTAssertEqual(plan.routeGroups[0].unresolvedDomains, ["portal.example.org"])
+    XCTAssertEqual(
+      plan.routeGroups[0].targets, [.init(address: "203.0.113.10", sources: ["fixed address"])])
+    XCTAssertTrue(PlanFormatter.text(plan).contains("portal.example.org: DNS resolution failed"))
+    let recovered = try RoutePlanner(
+      discovery: discovery,
+      resolver: FakeResolver(values: ["portal.example.org": ["203.0.113.20"]])
+    )
+    .plan(configuration: configuration)
+    XCTAssertTrue(recovered.routeGroups[0].unresolvedDomains.isEmpty)
+    XCTAssertEqual(recovered.routeGroups[0].targets.count, 2)
+  }
+
+  func testEmptyDNSResultIsReportedAsUnavailable() throws {
+    let configuration = try loadValidConfiguration()
+    let discovery = FakeDiscovery(
+      value: .init(
+        ssid: "Example Wi-Fi", physicalInterface: "en0",
+        physicalGateway: "192.0.2.1", physicalAddress: "192.0.2.44"))
+    let plan = try RoutePlanner(
+      discovery: discovery, resolver: FakeResolver(values: ["portal.example.org": []])
+    )
+    .plan(configuration: configuration)
+    XCTAssertEqual(plan.routeGroups[0].unresolvedDomains, ["portal.example.org"])
+  }
+
+  func testUnexpectedResolverErrorStillFailsClosed() throws {
+    let configuration = try loadValidConfiguration()
+    let discovery = FakeDiscovery(
+      value: .init(
+        ssid: "Example Wi-Fi", physicalInterface: "en0",
+        physicalGateway: "192.0.2.1", physicalAddress: "192.0.2.44"))
+    XCTAssertThrowsError(
+      try RoutePlanner(discovery: discovery, resolver: UnexpectedFailureResolver())
+        .plan(configuration: configuration))
+  }
   func testBuildsDeduplicatedReadOnlyHostRoutePlan() throws {
     let configuration = try loadValidConfiguration()
     let discovery = FakeDiscovery(
@@ -52,6 +113,18 @@ final class RoutePlannerTests: XCTestCase {
     XCTAssertTrue(plan.profileWasForced)
   }
 
+  func testHTTPSOnlyGroupNeverResolvesRouteTargetsOrCreatesRoutes() throws {
+    let configuration = try ConfigurationLoader.load(source: httpsOnlyConfiguration)
+    let discovery = FakeDiscovery(
+      value: .init(
+        ssid: "Example Wi-Fi", physicalInterface: "en0",
+        physicalGateway: "192.0.2.1", physicalAddress: "192.0.2.44"))
+    let plan = try RoutePlanner(discovery: discovery, resolver: FakeResolver(values: [:]))
+      .plan(configuration: configuration)
+    XCTAssertTrue(plan.routeGroups.isEmpty)
+    XCTAssertEqual(plan.checkOnlyGroups.map(\.id), ["status"])
+  }
+
   func testNoMatchingProfileFailsClosed() throws {
     let configuration = try loadValidConfiguration()
     let discovery = FakeDiscovery(
@@ -87,6 +160,12 @@ private struct FakeDiscovery: NetworkDiscovering {
   let value: NetworkSnapshot
 
   func snapshot() throws -> NetworkSnapshot { value }
+}
+
+private struct UnexpectedFailureResolver: DNSResolving {
+  func resolveIPv4(hostname: String) throws -> [String] {
+    throw CocoaError(.fileReadUnknown)
+  }
 }
 
 private struct FakeResolver: DNSResolving {

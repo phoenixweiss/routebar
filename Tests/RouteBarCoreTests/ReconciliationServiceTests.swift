@@ -3,6 +3,37 @@ import XCTest
 @testable import RouteBarCore
 
 final class ReconciliationServiceTests: XCTestCase {
+  func testDNSFailureRemovesOnlyObsoleteOwnedRouteWhileAddingHealthyRoute() throws {
+    let stale = "203.0.113.99"
+    let healthy = "203.0.113.10"
+    let foreign = "203.0.113.88"
+    let routeSystem = FakeRouteSystem(routes: [
+      stale: observed(address: stale, gateway: "198.51.100.1"),
+      foreign: observed(address: foreign, gateway: "198.51.100.1"),
+    ])
+    let store = MemoryRouteStateStore(
+      state: RouteState(routes: [
+        OwnedRoute(
+          address: stale, gateway: "198.51.100.1", interface: "en0", sources: ["failed.example.org"]
+        )
+      ]))
+    let base = routePlan(address: healthy)
+    let partial = RoutePlan(
+      profile: base.profile, network: base.network,
+      routeGroups: [
+        RouteGroupPlan(
+          id: "web", name: "Web", targets: base.routeGroups[0].targets,
+          unresolvedDomains: ["failed.example.org"])
+      ], checkOnlyGroups: [], profileWasForced: true)
+    let service = RouteReconciliationService(
+      inspector: routeSystem, mutator: routeSystem, stateStore: store)
+    let result = try service.apply(routePlan: partial)
+    XCTAssertEqual(Set(result.state.routes.map(\.address)), [healthy])
+    XCTAssertNotNil(routeSystem.routes[foreign])
+    XCTAssertFalse(routeSystem.mutations.contains { $0.contains(foreign) })
+    XCTAssertTrue(routeSystem.mutations.contains("delete \(stale) via 198.51.100.1"))
+    XCTAssertTrue(routeSystem.mutations.contains("add \(healthy) via 192.0.2.1"))
+  }
   func testApplyReplacesRouteAndPersistsNewOwnership() throws {
     let address = "203.0.113.10"
     let oldRoute = OwnedRoute(

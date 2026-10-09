@@ -6,7 +6,88 @@ import XCTest
 
 @testable import RouteBarApp
 
+private struct RenderingConnectivityRunner: ConnectivityRunning {
+  func check(_ target: ConnectivityTarget) async -> ConnectivityResult {
+    switch target {
+    case .https: ConnectivityResult(outcome: "unexpected-http-status", statusCode: 503)
+    case .endpoint(let endpoint):
+      ConnectivityResult(outcome: endpoint.protocol == .tls ? "certificate-failure" : "reachable")
+    }
+  }
+}
+
 final class RouteBarStatusViewRenderingTests: XCTestCase {
+  @MainActor
+  func testUnresolvedDomainsRenderWithoutReportingHealthyStatus() throws {
+    let base = sampleSnapshot(routesActive: true)
+    let snapshot = RouteStatusSnapshot(
+      profile: base.profile, network: base.network,
+      groups: base.groups.map { group in
+        RouteGroupStatus(
+          groupID: group.groupID, name: group.name, targets: group.targets,
+          unresolvedDomains: ["unavailable-service-with-a-long-name.example.org"])
+      }, daemon: base.daemon, checkedAt: base.checkedAt)
+    XCTAssertFalse(snapshot.allRoutesActive)
+    let model = RouteBarAppModel(
+      previewState: .ready(snapshot, configURL: URL(fileURLWithPath: "/tmp/example.yaml")),
+      bundledDaemonStatus: .notRegistered, showInDock: false)
+    try assertRenders(
+      RouteBarStatusView(model: model), outputPrefix: "routebar-dns-warning",
+      sizes: [NSSize(width: 470, height: 1000), NSSize(width: 510, height: 1000)])
+  }
+  @MainActor
+  func testConnectivityStatesRenderAtSupportedWidths() async throws {
+    let configuration = try ConfigurationLoader.load(source: sampleConfiguration)
+    let jobs = try ConnectivityJob.selected(configuration: configuration, profileID: "home")
+    let connectivity = ConnectivityModel(runner: RenderingConnectivityRunner())
+    let snapshot = sampleSnapshot(routesActive: true)
+    connectivity.update(
+      configURL: URL(fileURLWithPath: "/tmp/example.yaml"), profileID: "home",
+      network: snapshot.network, jobs: jobs)
+    let sizes = [NSSize(width: 410, height: 620), NSSize(width: 450, height: 620)]
+    try assertRenders(
+      ConnectivityView(model: ConnectivityModel(), check: {}).padding(20),
+      outputPrefix: "routebar-connectivity-empty", sizes: sizes)
+    try assertRenders(
+      ConnectivityView(model: connectivity, check: {}).padding(20),
+      outputPrefix: "routebar-connectivity-unchecked", sizes: sizes)
+    await connectivity.run()
+    try assertRenders(
+      ConnectivityView(model: connectivity, check: {}).padding(20),
+      outputPrefix: "routebar-connectivity-results", sizes: sizes)
+    connectivity.invalidate()
+    try assertRenders(
+      ConnectivityView(model: connectivity, check: {}).padding(20),
+      outputPrefix: "routebar-connectivity-stale", sizes: sizes)
+
+    let pausedRunner = PausedConnectivityRunner()
+    let checking = ConnectivityModel(runner: pausedRunner)
+    checking.update(
+      configURL: URL(fileURLWithPath: "/tmp/example.yaml"), profileID: "home",
+      network: snapshot.network, jobs: jobs)
+    let running = Task { await checking.run() }
+    await pausedRunner.waitForStart()
+    try assertRenders(
+      ConnectivityView(model: checking, check: {}).padding(20),
+      outputPrefix: "routebar-connectivity-checking", sizes: sizes)
+    checking.invalidate()
+    await pausedRunner.finish()
+    await running.value
+
+    let model = RouteBarAppModel(
+      previewState: .ready(snapshot, configURL: URL(fileURLWithPath: "/tmp/example.yaml")),
+      installedDaemon: .legacy(
+        InstalledDaemonConfiguration(
+          configURL: URL(fileURLWithPath: "/tmp/example.yaml"), profileID: "sample")),
+      bundledDaemonStatus: .notRegistered, showInDock: true)
+    model.connectivity.update(
+      configURL: URL(fileURLWithPath: "/tmp/example.yaml"), profileID: "home",
+      network: snapshot.network, jobs: jobs)
+    try assertRenders(
+      RouteBarStatusView(model: model), outputPrefix: "routebar-connectivity-window",
+      sizes: [NSSize(width: 470, height: 560), NSSize(width: 510, height: 1200)])
+  }
+
   @MainActor
   func testFirstRunStatusRendersAtSupportedWindowSizes() throws {
     let snapshot = sampleSnapshot()
@@ -413,7 +494,8 @@ final class RouteBarStatusViewRenderingTests: XCTestCase {
 
   @MainActor
   private func render<Content: View>(_ content: Content, at size: NSSize) throws -> Data {
-    let hostingView = NSHostingView(rootView: content)
+    let hostingView = NSHostingView(
+      rootView: content.background(Color(nsColor: .windowBackgroundColor)))
     hostingView.frame = NSRect(origin: .zero, size: size)
     hostingView.layoutSubtreeIfNeeded()
 
