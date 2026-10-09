@@ -8,7 +8,27 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- The local TLS test fixture now imports temporary identities into process memory
+  using macOS 15-compatible APIs, keeping CI certificates out of the Keychain.
+- DNS failures are isolated per bypass domain, with unresolved names shown in the
+  window and read-only plan; healthy routes continue to reconcile without reusing stale IPs.
+- Connectivity checks refresh their kernel-routed source address after DHCP or
+  network changes, and HTTPS checks use bounded, verified TLS/HTTP transport.
+
+### Added
+
+- The first published DMG for the 0.4 series includes the manual Connectivity
+  section and read-only TCP, TLS, SMTP STARTTLS and HTTPS development commands.
+  Checks do not authenticate, change routes or activate windows in the background.
+- Transport endpoints and HTTPS checks support individual bounded timeouts;
+  check-only groups support HTTPS checks, transport endpoints or both.
+
 ## [0.4.0] - 2026-10-10
+
+Source tag only: the macOS 15 test fixture failed before DMG publication.
+These application changes are included in the 0.4.1 public release.
 
 ### Fixed
 

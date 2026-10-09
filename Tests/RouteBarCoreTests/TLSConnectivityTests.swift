@@ -173,6 +173,10 @@ final class LocalTLSServer {
     framerOptions: ((NWProtocolTLS.Options) -> NWProtocolFramer.Options)? = nil,
     connectionHandler: (@Sendable (NWConnection) -> Void)? = nil
   ) throws {
+    guard #available(macOS 15, *) else {
+      throw XCTSkip(
+        "The local TLS fixture requires memory-only identity import on macOS 15 or newer.")
+    }
     directory = FileManager.default.temporaryDirectory.appendingPathComponent(
       "routebar-tls-\(UUID().uuidString)")
     try FileManager.default.createDirectory(
@@ -244,20 +248,31 @@ final class LocalTLSServer {
       ca = try XCTUnwrap(
         SecCertificateCreateWithData(
           nil, Data(contentsOf: directory.appendingPathComponent("ca.der")) as CFData))
+      let fixturePassphrase = "routebar-test-only"
       try Self.openssl(
-        ["x509", "-in", "server.pem", "-outform", "DER", "-out", "server.der"], in: directory)
-      try Self.openssl(
-        ["rsa", "-in", "server.key", "-outform", "DER", "-out", "key.der"], in: directory)
-      let certificate = try XCTUnwrap(
-        SecCertificateCreateWithData(
-          nil,
-          Data(contentsOf: directory.appendingPathComponent("server.der")) as CFData))
-      let key = try XCTUnwrap(
-        SecKeyCreateWithData(
-          Data(contentsOf: directory.appendingPathComponent("key.der")) as CFData,
-          [kSecAttrKeyType: kSecAttrKeyTypeRSA, kSecAttrKeyClass: kSecAttrKeyClassPrivate]
-            as CFDictionary, nil))
-      let identity = try XCTUnwrap(SecIdentityCreate(nil, certificate, key))
+        [
+          "pkcs12", "-export", "-inkey", "server.key", "-in", "server.pem",
+          "-out", "server.p12", "-passout", "pass:\(fixturePassphrase)",
+          "-keypbe", "PBE-SHA1-3DES", "-certpbe", "PBE-SHA1-3DES", "-macalg", "sha1",
+        ],
+        in: directory)
+      var importedItems: CFArray?
+      // Never import ephemeral test certificates or keys into the user's Keychain.
+      let status = SecPKCS12Import(
+        try Data(contentsOf: directory.appendingPathComponent("server.p12")) as CFData,
+        [
+          kSecImportExportPassphrase as String: fixturePassphrase,
+          kSecImportToMemoryOnly as String: true,
+        ] as CFDictionary, &importedItems)
+      guard status == errSecSuccess else {
+        throw NSError(domain: NSOSStatusErrorDomain, code: Int(status))
+      }
+      let item = try XCTUnwrap((importedItems as? [[String: Any]])?.first)
+      let identityValue = try XCTUnwrap(item[kSecImportItemIdentity as String])
+      guard CFGetTypeID(identityValue as CFTypeRef) == SecIdentityGetTypeID() else {
+        throw NSError(domain: "LocalTLSServer", code: 2)
+      }
+      let identity = identityValue as! SecIdentity
       let tls = NWProtocolTLS.Options()
       sec_protocol_options_set_local_identity(
         tls.securityProtocolOptions, try XCTUnwrap(sec_identity_create(identity)))
