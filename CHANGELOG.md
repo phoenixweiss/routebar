@@ -8,6 +8,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-10
+
 ### Fixed
 
 - A DNS failure for one bypass domain no longer blocks reconciliation of healthy
@@ -206,7 +208,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Privileged route state is restricted to a fixed root-owned path instead of a
   caller-selected location.
 
-[Unreleased]: https://github.com/phoenixweiss/routebar/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/phoenixweiss/routebar/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/phoenixweiss/routebar/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/phoenixweiss/routebar/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/phoenixweiss/routebar/compare/v0.2.6...v0.3.0
 [0.2.6]: https://github.com/phoenixweiss/routebar/compare/v0.2.5...v0.2.6
