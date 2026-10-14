@@ -169,8 +169,6 @@ network behavior can be verified without weakening the fail-closed model.
 
 ## Editing rules
 
-This editor is available in development builds, not in the published 0.4.1 DMG.
-
 **Manage Rules…** opens the native group and domain editor. Select a bypass group,
 rename it, add/edit/remove exact domains, or create a group and choose the profiles
 that use it. A pasted HTTP(S) URL becomes a hostname without its path or query.
