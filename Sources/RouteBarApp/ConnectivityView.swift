@@ -9,11 +9,12 @@ struct ConnectivityView: View {
     VStack(alignment: .leading, spacing: 12) {
       HStack {
         Text("CONNECTIVITY")
-          .font(.system(size: 11.5, weight: .semibold))
+          .font(.custom("Manrope", fixedSize: 11.5).weight(.semibold))
           .foregroundStyle(.secondary)
           .tracking(0.8)
         Spacer()
         Button(model.isChecking ? "Checking…" : "Check") { check() }
+          .buttonStyle(RouteBarButtonStyle())
           .controlSize(.large)
           .disabled(
             !canCheck || model.isChecking || model.configurationUnavailable || model.jobs.isEmpty
@@ -22,23 +23,23 @@ struct ConnectivityView: View {
       }
 
       Text("Manual checks through current routes. No routing changes or sign-in.")
-        .font(.system(size: 13.5))
+        .font(.custom("Manrope", fixedSize: 13.5))
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
 
       if model.configurationUnavailable {
         Text("Checks unavailable. Refresh to load a valid configuration and profile.")
-          .font(.system(size: 13.5))
+          .font(.custom("Manrope", fixedSize: 13.5))
           .foregroundStyle(.secondary)
       } else if model.jobs.isEmpty {
         Text("No connectivity checks are configured for this profile.")
-          .font(.system(size: 14.5))
+          .font(.custom("Manrope", fixedSize: 14.5))
           .foregroundStyle(.secondary)
       } else {
         ForEach(Array(model.jobs.enumerated()), id: \.element.id) { index, job in
           if index == 0 || model.jobs[index - 1].groupName != job.groupName {
             Text(job.groupName)
-              .font(.system(size: 15.5, weight: .semibold))
+              .font(.custom("Manrope", fixedSize: 15.5).weight(.semibold))
               .padding(.top, index == 0 ? 2 : 10)
           }
           checkRow(job)
@@ -48,11 +49,11 @@ struct ConnectivityView: View {
 
       if model.isStale {
         Label("Results are out of date. Run checks again.", systemImage: "clock")
-          .font(.system(size: 13.5))
+          .font(.custom("Manrope", fixedSize: 13.5))
           .foregroundStyle(.secondary)
       } else if let checkedAt = model.checkedAt {
         Text("Checked at \(checkedAt.formatted(date: .omitted, time: .standard)) · manual snapshot")
-          .font(.system(size: 12.5))
+          .font(.custom("Manrope", fixedSize: 12.5))
           .foregroundStyle(.secondary)
       }
     }
@@ -64,7 +65,7 @@ struct ConnectivityView: View {
     return VStack(alignment: .leading, spacing: 5) {
       HStack(alignment: .firstTextBaseline, spacing: 12) {
         Text(job.target.title)
-          .font(.system(size: 14.5, weight: .medium))
+          .font(.custom("Manrope", fixedSize: 14.5).weight(.medium))
           .fixedSize(horizontal: false, vertical: true)
         Spacer(minLength: 6)
         HStack(alignment: .firstTextBaseline, spacing: 5) {
@@ -86,12 +87,12 @@ struct ConnectivityView: View {
           )
           .foregroundStyle(model.isStale || result == nil ? Color.secondary : Color.primary)
         }
-        .font(.system(size: 13.5))
+        .font(.custom("Manrope", fixedSize: 13.5))
         .multilineTextAlignment(.trailing)
         .fixedSize(horizontal: false, vertical: true)
       }
       Text(job.target.detail)
-        .font(.system(size: 12.5))
+        .font(.custom("Manrope", fixedSize: 12.5))
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
     }

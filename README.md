@@ -167,6 +167,39 @@ Profiles currently require an explicit selection for the bundled service.
 Automatic switching by Wi-Fi name remains disabled until SSID access and unknown
 network behavior can be verified without weakening the fail-closed model.
 
+## Editing rules
+
+This editor is available in development builds, not in the published 0.4.1 DMG.
+
+**Manage Rules…** opens the native group and domain editor. Select a bypass group,
+rename it, add/edit/remove exact domains, or create a group and choose the profiles
+that use it. A pasted HTTP(S) URL becomes a hostname without its path or query.
+Duplicate names within a group are rejected. **Save Changes** or **Create Group**
+validates the complete configuration, writes it and reads it back. Any domain still
+in the input field is included automatically; Add is optional. Closing or switching
+groups with unsaved changes offers save and continue, discard and continue, or stay
+in the editor. A failed save keeps the draft and cancels the transition. Group deletion
+is confirmed and also removes profile memberships. Empty profiles are rejected.
+
+The ordinary YAML remains the single configuration source. Edits patch individual
+fields rather than rewriting the document; comments and unrelated settings are
+retained, though comments in an edited field may move. Symbolic links are followed
+without replacing the link. Conflicting external edits or link retargeting cause a
+refusal: **Reload File…** offers recovery with the same unsaved-changes protection.
+Atomic writes are coordinated with macOS file
+access, preserve file permissions, and create a private original-file backup under
+`~/Library/Application Support/RouteBar/ConfigBackups` before replacement.
+
+This first editor supports UTF-8 configurations up to 1 MiB with LF line endings,
+block-style groups/profiles, and inline or block domain and profile-membership lists.
+Aliases, anchors and unsupported layouts are refused without rewriting them; use
+**Open Config** for those files. Existing fixed addresses and HTTPS checks are
+preserved; check-only groups are read-only in this editor. Saving does not enable a
+service. Enabled legacy automation reads the file on its next 30-second cycle;
+the built-in service can reconcile immediately through its existing control path.
+Saved and applied states are reported separately. HAR import and automatic
+dependency discovery are not part of this workflow; wildcards remain unsupported.
+
 ## Safety boundary
 
 RouteBar never broadens an exception to a subnet and never changes the default

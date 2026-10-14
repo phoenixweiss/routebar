@@ -10,6 +10,18 @@ struct RouteBarStatusView: View {
   @State private var showingDisableConfirmation = false
   @State private var showingUpdateConfirmation = false
   @State private var showingDiagnostics = false
+  @State private var showingRulesEditor = false
+  @State private var expandedRouteGroups = Set<String>()
+  var registerEditorClose: (((() -> Void)?) -> Void)?
+
+  init(
+    model: RouteBarAppModel, expandedRouteGroups: Set<String> = [],
+    registerEditorClose: (((() -> Void)?) -> Void)? = nil
+  ) {
+    self.model = model
+    _expandedRouteGroups = State(initialValue: expandedRouteGroups)
+    self.registerEditorClose = registerEditorClose
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -79,6 +91,12 @@ struct RouteBarStatusView: View {
     .sheet(isPresented: $showingDiagnostics) {
       RouteBarDiagnosticsView(diagnostics: model.diagnostics())
     }
+    .sheet(isPresented: $showingRulesEditor) {
+      RulesEditorView(
+        model: RulesEditorModel(url: model.configurationURL),
+        serviceNote: rulesServiceNote,
+        onSaved: { await model.rulesWereSaved() }, registerCloseRequest: registerEditorClose)
+    }
   }
 
   private var productToolbar: some View {
@@ -97,6 +115,7 @@ struct RouteBarStatusView: View {
         showingDiagnostics = true
       }
       .font(routeBarFont(13, weight: .medium))
+      .buttonStyle(RouteBarButtonStyle())
       .controlSize(.large)
       .help("Show a safe technical summary")
 
@@ -104,6 +123,7 @@ struct RouteBarStatusView: View {
         Task { await model.refresh() }
       }
       .font(routeBarFont(13, weight: .medium))
+      .buttonStyle(RouteBarButtonStyle())
       .controlSize(.large)
       .disabled(model.isRefreshing)
       .keyboardShortcut("r", modifiers: .command)
@@ -296,30 +316,59 @@ struct RouteBarStatusView: View {
     let active = group.activeCount == group.targets.count && group.unresolvedDomains.isEmpty
 
     return VStack(alignment: .leading, spacing: 5) {
-      HStack(spacing: 10) {
-        ZStack {
-          Circle()
-            .fill((active ? Color.green : Color.orange).opacity(0.13))
-          Image(systemName: active ? "checkmark" : "exclamationmark")
-            .font(.system(size: 10, weight: .bold))
-            .foregroundStyle(active ? Color.green : Color.orange)
+      Button {
+        if expandedRouteGroups.contains(group.groupID) {
+          expandedRouteGroups.remove(group.groupID)
+        } else {
+          expandedRouteGroups.insert(group.groupID)
         }
-        .frame(width: 18, height: 18)
-        .accessibilityHidden(true)
+      } label: {
+        HStack(spacing: 10) {
+          Image(
+            systemName: expandedRouteGroups.contains(group.groupID)
+              ? "chevron.down" : "chevron.right"
+          )
+          .font(.system(size: 10, weight: .semibold)).frame(width: 10)
+          ZStack {
+            Circle()
+              .fill((active ? Color.green : Color.orange).opacity(0.13))
+            Image(systemName: active ? "checkmark" : "exclamationmark")
+              .font(.system(size: 10, weight: .bold))
+              .foregroundStyle(active ? Color.green : Color.orange)
+          }
+          .frame(width: 18, height: 18)
+          .accessibilityHidden(true)
 
-        Text(group.name)
-          .font(routeBarFont(15.5, weight: .semibold))
-        Spacer(minLength: 12)
-        Text("\(group.activeCount) / \(group.targets.count)")
-          .font(routeBarFont(13.5, weight: .medium).monospacedDigit())
-          .foregroundStyle(.secondary)
+          Text(group.name)
+            .font(routeBarFont(15.5, weight: .semibold))
+          Spacer(minLength: 12)
+          Text("\(group.activeCount) / \(group.targets.count)")
+            .font(routeBarFont(13.5, weight: .medium).monospacedDigit())
+            .foregroundStyle(.secondary)
+        }.contentShape(Rectangle())
       }
+      .buttonStyle(.plain)
+      .accessibilityLabel("\(group.name), \(group.activeCount) of \(group.targets.count) active")
+      .accessibilityValue(expandedRouteGroups.contains(group.groupID) ? "Expanded" : "Collapsed")
+      .accessibilityHint("Press to show or hide destinations")
 
-      Text(sourceSummary(group))
+      let sources = Array(Set(group.targets.flatMap(\.sources).filter { $0 != "fixed address" }))
+        .sorted()
+      if expandedRouteGroups.contains(group.groupID), !sources.isEmpty {
+        VStack(alignment: .leading, spacing: 4) {
+          ForEach(sources, id: \.self) { source in
+            Text(source).textSelection(.enabled)
+              .fixedSize(horizontal: false, vertical: true)
+          }
+        }
         .font(routeBarFont(13.5))
         .foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
-        .padding(.leading, 28)
+        .padding(.leading, 48)
+      } else {
+        Text(sourceSummary(group))
+          .font(routeBarFont(13.5)).foregroundStyle(.secondary)
+          .lineLimit(1).truncationMode(.tail).padding(.leading, 48)
+      }
 
       ForEach(group.unresolvedDomains, id: \.self) { domain in
         Label(
@@ -508,7 +557,7 @@ struct RouteBarStatusView: View {
       Button("Reload Config") {
         Task { await model.reloadConfiguration() }
       }
-      .buttonStyle(.borderedProminent)
+      .buttonStyle(RouteBarButtonStyle(prominent: true))
       .tint(brandInk)
       .controlSize(.large)
       .disabled(
@@ -523,7 +572,7 @@ struct RouteBarStatusView: View {
       Button("Disable Automatic Routing…") {
         showingDisableConfirmation = true
       }
-      .buttonStyle(.bordered)
+      .buttonStyle(RouteBarButtonStyle(destructive: true))
       .tint(.red)
       .controlSize(.large)
       .disabled(
@@ -658,7 +707,7 @@ struct RouteBarStatusView: View {
             Button("Enable Automatic Routing") {
               showingEnableConfirmation = true
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(RouteBarButtonStyle(prominent: true))
             .tint(brandInk)
             .controlSize(.large)
             .disabled(model.bundledDaemonRegistrationState == .registering)
@@ -676,7 +725,7 @@ struct RouteBarStatusView: View {
         Button("Open Login Items") {
           model.openLoginItemsSettings()
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(RouteBarButtonStyle(prominent: true))
         .tint(brandInk)
         .controlSize(.large)
       case .enabled:
@@ -685,7 +734,7 @@ struct RouteBarStatusView: View {
             Button("Update Service…") {
               showingUpdateConfirmation = true
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(RouteBarButtonStyle(prominent: true))
             .tint(brandInk)
             .controlSize(.large)
             .disabled(model.bundledDaemonUpdateState.isInProgress)
@@ -719,7 +768,7 @@ struct RouteBarStatusView: View {
               Button("Use Selected Profile") {
                 Task { await model.configureBundledDaemon() }
               }
-              .buttonStyle(.borderedProminent)
+              .buttonStyle(RouteBarButtonStyle(prominent: true))
               .tint(brandInk)
               .controlSize(.large)
               .disabled(model.bundledDaemonConfigurationState == .configuring)
@@ -737,7 +786,7 @@ struct RouteBarStatusView: View {
               Button("Apply Routes") {
                 showingApplyConfirmation = true
               }
-              .buttonStyle(.borderedProminent)
+              .buttonStyle(RouteBarButtonStyle(prominent: true))
               .tint(brandInk)
               .controlSize(.large)
               .disabled(model.bundledDaemonReconciliationState == .applying)
@@ -864,25 +913,37 @@ struct RouteBarStatusView: View {
     }
   }
 
+  private var rulesServiceNote: String {
+    if case .legacy = model.installedDaemon {
+      return
+        "The legacy service reads saved rules every 30 seconds. Check route status after saving; this editor does not confirm application."
+    }
+    return
+      "Saving does not enable automation. Route application is reported separately after each save."
+  }
+
   private var footerActions: some View {
     HStack(spacing: 10) {
       Button("Open Config") {
         model.openConfiguration()
       }
-      .buttonStyle(.borderedProminent)
+      .buttonStyle(RouteBarButtonStyle(prominent: true))
       .tint(brandInk)
 
       Button("Reveal in Finder") {
         model.revealConfiguration()
       }
-      .buttonStyle(.bordered)
+      .buttonStyle(RouteBarButtonStyle())
+
+      Button("Manage Rules…") { showingRulesEditor = true }
+        .buttonStyle(RouteBarButtonStyle())
     }
     .font(routeBarFont(13, weight: .medium))
     .controlSize(.large)
   }
 
   private var preferenceToggles: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    HStack(spacing: 24) {
       preferenceToggle(
         "Launch at Login",
         isOn: launchAtLoginBinding,
@@ -894,7 +955,7 @@ struct RouteBarStatusView: View {
 
       preferenceToggle("Show in Dock", isOn: $model.showInDock)
     }
-    .frame(width: 190, alignment: .leading)
+    .frame(maxWidth: 390, alignment: .leading)
     .font(routeBarFont(13))
   }
 
@@ -971,7 +1032,7 @@ struct RouteBarStatusView: View {
     Button("Open Login Items") {
       model.openLaunchAtLoginSettings()
     }
-    .buttonStyle(.bordered)
+    .buttonStyle(RouteBarButtonStyle())
     .controlSize(.small)
   }
 

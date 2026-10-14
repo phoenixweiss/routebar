@@ -8,6 +8,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- A native rules editor creates, renames and deletes bypass groups, edits exact
+  domains and profile memberships, and saves validated YAML without manual copying.
+  It rejects duplicates, preserves unrelated settings and comments, follows existing
+  symlinks, guards external edits and creates private backups before atomic saves.
+  Saving and route application are reported separately; unsupported YAML layouts
+  are refused rather than re-serialized. The experimental HAR-copy interface has
+  been replaced by this editor.
+  Contextual save/create actions include pending domain input and protect drafts
+  when closing, switching groups or recovering from external file changes.
+
+### Changed
+
+- Route group headers now expand into one destination per line, replacing the
+  collapsed summary without repeating it. Routing warnings remain visible.
+- Both windows use consistent, readable button states in light and dark mode.
+
 ## [0.4.1] - 2026-10-10
 
 ### Fixed

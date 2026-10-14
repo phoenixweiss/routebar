@@ -75,12 +75,18 @@ final class RouteBarApplicationController: NSObject, NSWindowDelegate {
 
   let model = RouteBarAppModel()
   private var statusWindowController: NSWindowController?
+  // Route native Close / Command-W through the active editor's unsaved-changes policy.
+  var rulesEditorCloseRequest: (() -> Void)?
 
   func handleStatusWindowRequest(_ request: RouteBarWindowPresentationRequest) {
     guard let presentation = request.presentation else { return }
 
     if statusWindowController == nil {
-      let content = RouteBarStatusView(model: model)
+      let content = RouteBarStatusView(
+        model: model,
+        registerEditorClose: { [weak self] action in
+          self?.rulesEditorCloseRequest = action
+        })
       let window = NSWindow(
         contentRect: NSRect(x: 0, y: 0, width: 510, height: 660),
         styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -114,5 +120,11 @@ final class RouteBarApplicationController: NSObject, NSWindowDelegate {
 
   func windowWillClose(_ notification: Notification) {
     statusWindowController?.window?.orderOut(nil)
+  }
+
+  func windowShouldClose(_ sender: NSWindow) -> Bool {
+    guard let rulesEditorCloseRequest else { return true }
+    rulesEditorCloseRequest()
+    return false
   }
 }

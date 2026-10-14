@@ -1,4 +1,5 @@
 import AppKit
+import CoreText
 import RouteBarCore
 import RouteBarDaemonIPC
 import SwiftUI
@@ -17,6 +18,123 @@ private struct RenderingConnectivityRunner: ConnectivityRunning {
 }
 
 final class RouteBarStatusViewRenderingTests: XCTestCase {
+  @MainActor
+  func testLargeRouteGroupRendersAsCompactSummary() throws {
+    let base = sampleSnapshot(routesActive: true)
+    let snapshot = RouteStatusSnapshot(
+      profile: base.profile, network: base.network,
+      groups: [
+        RouteGroupStatus(
+          groupID: "projects", name: "Example projects",
+          targets: (1...24).map { index in
+            RouteTargetStatus(
+              address: "192.0.2.\(index)", sources: ["project-\(index).example.org"],
+              isActive: true, observedGateway: "192.0.2.1", observedInterface: "en0")
+          })
+      ], daemon: base.daemon, checkedAt: base.checkedAt)
+    let model = RouteBarAppModel(
+      previewState: .ready(snapshot, configURL: URL(fileURLWithPath: "/tmp/example.yaml")),
+      bundledDaemonStatus: .notRegistered, showInDock: false)
+    try assertRenders(
+      RouteBarStatusView(model: model), outputPrefix: "routebar-compact-24-destinations",
+      sizes: [NSSize(width: 470, height: 560), NSSize(width: 510, height: 900)])
+    try assertRenders(
+      RouteBarStatusView(model: model, expandedRouteGroups: ["projects"]),
+      outputPrefix: "routebar-expanded-24-destinations",
+      sizes: [NSSize(width: 470, height: 560), NSSize(width: 510, height: 1100)])
+  }
+
+  @MainActor
+  func testRulesEditorRendersSavedAndExternalConflictStates() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let url = directory.appendingPathComponent("config.yaml")
+    try editorFixture.write(to: url, atomically: true, encoding: .utf8)
+    let model = RulesEditorModel(
+      url: url, store: RulesFileStore(backupDirectory: directory.appendingPathComponent("backups")))
+    await model.load()
+    let view = RulesEditorView(
+      model: model, serviceNote: "Rules application is not confirmed.",
+      onSaved: { "Rules application is not confirmed." })
+    let sizes = [NSSize(width: 720, height: 570), NSSize(width: 820, height: 640)]
+    model.name = "Saved group"
+    let saved = await model.save()
+    XCTAssertTrue(saved)
+    try assertRenders(view, outputPrefix: "routebar-rules-saved", sizes: sizes)
+    model.name = "Unsaved draft"
+    let external = try String(contentsOf: url, encoding: .utf8) + "# external edit\n"
+    try external.write(to: url, atomically: true, encoding: .utf8)
+    let overwritten = await model.save()
+    XCTAssertFalse(overwritten)
+    try assertRenders(view, outputPrefix: "routebar-rules-conflict", sizes: sizes)
+  }
+
+  @MainActor
+  func testRulesEditorRendersExistingNewAndInvalidDrafts() throws {
+    let model = RulesEditorModel(
+      url: URL(fileURLWithPath: "/tmp/example.yaml"), previewSource: editorFixture)
+    let view = RulesEditorView(
+      model: model, serviceNote: "Saved and applied are separate states.",
+      onSaved: { "Not applied in preview." })
+    let sizes = [NSSize(width: 720, height: 570), NSSize(width: 820, height: 640)]
+    for scheme in [ColorScheme.light, .dark] {
+      let themedView = view.environment(\.colorScheme, scheme)
+        .background(scheme == .dark ? Color(nsColor: .windowBackgroundColor) : Color.white)
+      let appearance: NSAppearance.Name = scheme == .dark ? .darkAqua : .aqua
+      model.discard()
+      try assertRenders(
+        themedView, outputPrefix: "routebar-rules-existing-\(scheme)", sizes: sizes,
+        appearance: appearance)
+      model.domainInput = "long-service-name.example.org"
+      try assertRenders(
+        themedView, outputPrefix: "routebar-rules-input-\(scheme)", sizes: sizes,
+        appearance: appearance)
+      model.addDomain()
+      model.editDomain("long-service-name.example.org")
+      try assertRenders(
+        themedView, outputPrefix: "routebar-rules-edit-\(scheme)", sizes: sizes,
+        appearance: appearance)
+      model.newGroup()
+      try assertRenders(
+        themedView, outputPrefix: "routebar-rules-new-\(scheme)", sizes: sizes,
+        appearance: appearance)
+      model.domainInput = "*.example.org"
+      model.addDomain()
+      try assertRenders(
+        themedView, outputPrefix: "routebar-rules-error-\(scheme)", sizes: sizes,
+        appearance: appearance)
+      let hosts =
+        ["a-very-long-service-name-for-wrapping-in-a-narrow-editor.example.org"]
+        + (1...20).map { "service-\($0).example.org" }
+      let denseSource =
+        editorFixture.replacingOccurrences(
+          of: "domains: [example.org]", with: "domains: [\(hosts.joined(separator: ", "))]")
+          + """
+          \n  - id: library
+              name: Library services
+              mode: bypass-vpn
+              domains: [library.example.org]
+            - id: projects
+              name: Проекты и инструменты
+              mode: bypass-vpn
+              domains: [projects.example.org]
+          """
+      let denseModel = RulesEditorModel(
+        url: URL(fileURLWithPath: "/tmp/example.yaml"), previewSource: denseSource)
+      XCTAssertEqual(denseModel.groups.count, 3)
+      XCTAssertEqual(denseModel.domains.count, 21)
+      try assertRenders(
+        RulesEditorView(
+          model: denseModel,
+          serviceNote:
+            "The service reads saved rules every 30 seconds. Check route status after saving; this editor does not confirm application.",
+          onSaved: { "Not applied in preview." }
+        ).environment(\.colorScheme, scheme)
+          .background(scheme == .dark ? Color(nsColor: .windowBackgroundColor) : Color.white),
+        outputPrefix: "routebar-rules-dense-\(scheme)", sizes: sizes, appearance: appearance)
+    }
+  }
   @MainActor
   func testUnresolvedDomainsRenderWithoutReportingHealthyStatus() throws {
     let base = sampleSnapshot(routesActive: true)
@@ -479,23 +597,37 @@ final class RouteBarStatusViewRenderingTests: XCTestCase {
   private func assertRenders<Content: View>(
     _ content: Content,
     outputPrefix: String,
-    sizes: [NSSize] = [NSSize(width: 510, height: 660), NSSize(width: 470, height: 560)]
+    sizes: [NSSize] = [NSSize(width: 510, height: 660), NSSize(width: 470, height: 560)],
+    appearance: NSAppearance.Name? = nil
   ) throws {
+    let fontURL = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+      .appendingPathComponent("Support/Fonts/Manrope-Variable.ttf")
+    CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, nil)
+    let appearances = appearance.map { [$0] } ?? [.aqua, .darkAqua]
     for size in sizes {
-      let png = try render(content, at: size)
-      XCTAssertGreaterThan(png.count, 10_000)
+      for theme in appearances {
+        let scheme: ColorScheme = theme == .darkAqua ? .dark : .light
+        let png = try render(
+          content.environment(\.colorScheme, scheme), at: size, appearance: theme)
+        XCTAssertGreaterThan(png.count, 10_000)
 
-      if let directory = ProcessInfo.processInfo.environment["ROUTEBAR_STATUS_PREVIEW_DIR"] {
-        let name = "\(outputPrefix)-\(Int(size.width))x\(Int(size.height)).png"
-        try png.write(to: URL(fileURLWithPath: directory).appendingPathComponent(name))
+        if let directory = ProcessInfo.processInfo.environment["ROUTEBAR_STATUS_PREVIEW_DIR"] {
+          let themedPrefix = appearance == nil ? "\(outputPrefix)-\(scheme)" : outputPrefix
+          let name = "\(themedPrefix)-\(Int(size.width))x\(Int(size.height)).png"
+          try png.write(to: URL(fileURLWithPath: directory).appendingPathComponent(name))
+        }
       }
     }
   }
 
   @MainActor
-  private func render<Content: View>(_ content: Content, at size: NSSize) throws -> Data {
+  private func render<Content: View>(
+    _ content: Content, at size: NSSize, appearance: NSAppearance.Name? = nil
+  ) throws -> Data {
     let hostingView = NSHostingView(
       rootView: content.background(Color(nsColor: .windowBackgroundColor)))
+    if let appearance { hostingView.appearance = NSAppearance(named: appearance) }
     hostingView.frame = NSRect(origin: .zero, size: size)
     hostingView.layoutSubtreeIfNeeded()
 

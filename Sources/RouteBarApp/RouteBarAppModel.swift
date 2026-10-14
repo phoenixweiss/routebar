@@ -486,6 +486,28 @@ final class RouteBarAppModel: ObservableObject {
     }
   }
 
+  func rulesWereSaved() async -> String {
+    guard !configurationReloadState.isInProgress else {
+      return "YAML saved. Another reconciliation is in progress; check Automation for its result."
+    }
+    // Never present an older successful reconciliation as confirmation of this save.
+    configurationReloadState = .idle
+    await refresh()
+    if case .legacy = installedDaemon {
+      return
+        "YAML saved. The legacy service reads it every 30 seconds. Application of this revision is not confirmed here; check route status."
+    }
+    await reloadConfiguration()
+    switch configurationReloadState {
+    case .applied: return "YAML saved; the built-in service confirmed reconciliation."
+    case .rejected:
+      return
+        "YAML saved, but the service rejected reconciliation. Check Automation in the main window."
+    case .idle, .reloading:
+      return "YAML saved. Application is not confirmed; check Automation in the main window."
+    }
+  }
+
   func reloadConfiguration() async {
     guard bundledDaemonStatus == .enabled,
       case .connected = bundledDaemonConnectionStatus,
@@ -734,7 +756,7 @@ final class RouteBarAppModel: ObservableObject {
     NSApplication.shared.terminate(nil)
   }
 
-  private var configurationURL: URL {
+  var configurationURL: URL {
     switch state {
     case .ready(_, let configURL): configURL
     case .selectingProfile(let selection): selection.configURL
