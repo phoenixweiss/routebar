@@ -134,7 +134,9 @@ struct RouteBarStatusView: View {
     .background(Color(nsColor: .controlBackgroundColor))
   }
 
-  private var statusHeader: some View {
+  private var statusHeader: some View { statusHeaderContent(colorScheme: colorScheme) }
+
+  func statusHeaderContent(colorScheme: ColorScheme) -> some View {
     HStack(spacing: 14) {
       ZStack {
         Circle()
@@ -158,6 +160,7 @@ struct RouteBarStatusView: View {
     }
     .padding(.horizontal, 30)
     .padding(.vertical, 18)
+    .frame(maxWidth: .infinity, alignment: .leading)
     .background(Color(nsColor: .textBackgroundColor))
   }
 

@@ -19,6 +19,57 @@ private struct RenderingConnectivityRunner: ConnectivityRunning {
 
 final class RouteBarStatusViewRenderingTests: XCTestCase {
   @MainActor
+  func testWarningHeaderBackgroundCoversFullWindowWidth() throws {
+    let base = sampleSnapshot(routesActive: true)
+    let snapshot = RouteStatusSnapshot(
+      profile: base.profile, network: base.network,
+      groups: [
+        RouteGroupStatus(
+          groupID: "web", name: "Example services",
+          targets: (1...32).map { index in
+            RouteTargetStatus(
+              address: "192.0.2.\(index)", sources: ["service-\(index).example.org"],
+              isActive: index != 32, observedGateway: "192.0.2.1", observedInterface: "en0")
+          })
+      ], daemon: base.daemon, checkedAt: base.checkedAt)
+    let model = RouteBarAppModel(
+      previewState: .ready(snapshot, configURL: URL(fileURLWithPath: "/tmp/example.yaml")),
+      installedDaemon: .legacy(
+        InstalledDaemonConfiguration(
+          configURL: URL(fileURLWithPath: "/tmp/example.yaml"), profileID: "home")),
+      bundledDaemonStatus: .notRegistered, showInDock: false)
+    for width in [470.0, 510.0, 680.0] {
+      for theme in [NSAppearance.Name.aqua, .darkAqua] {
+        let scheme: ColorScheme = theme == .darkAqua ? .dark : .light
+        let png = try render(
+          RouteBarStatusView(model: model).statusHeaderContent(colorScheme: scheme)
+            .frame(width: width, height: 120, alignment: .top)
+            .background(Color(nsColor: .magenta)).environment(\.colorScheme, scheme),
+          at: NSSize(width: width, height: 120), appearance: theme)
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: png))
+        let scale = Double(bitmap.pixelsWide) / width
+        // A contrasting parent exposes uncovered margins even without a live NSWindow.
+        let y = Int(5 * scale)
+        let left = try XCTUnwrap(
+          bitmap.colorAt(x: bitmap.pixelsWide / 2, y: y)?.usingColorSpace(.deviceRGB))
+        let right = try XCTUnwrap(
+          bitmap.colorAt(x: bitmap.pixelsWide - Int(3 * scale), y: y)?.usingColorSpace(.deviceRGB))
+        XCTAssertEqual(left.redComponent, right.redComponent, accuracy: 0.01, "\(width), \(scheme)")
+        XCTAssertEqual(
+          left.greenComponent, right.greenComponent, accuracy: 0.01, "\(width), \(scheme)")
+        XCTAssertEqual(
+          left.blueComponent, right.blueComponent, accuracy: 0.01, "\(width), \(scheme)")
+      }
+    }
+    try assertRenders(
+      RouteBarStatusView(model: model), outputPrefix: "routebar-warning-header",
+      sizes: [
+        NSSize(width: 470, height: 660), NSSize(width: 510, height: 660),
+        NSSize(width: 680, height: 660),
+      ])
+  }
+
+  @MainActor
   func testLargeRouteGroupRendersAsCompactSummary() throws {
     let base = sampleSnapshot(routesActive: true)
     let snapshot = RouteStatusSnapshot(
@@ -600,10 +651,6 @@ final class RouteBarStatusViewRenderingTests: XCTestCase {
     sizes: [NSSize] = [NSSize(width: 510, height: 660), NSSize(width: 470, height: 560)],
     appearance: NSAppearance.Name? = nil
   ) throws {
-    let fontURL = URL(fileURLWithPath: #filePath)
-      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-      .appendingPathComponent("Support/Fonts/Manrope-Variable.ttf")
-    CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, nil)
     let appearances = appearance.map { [$0] } ?? [.aqua, .darkAqua]
     for size in sizes {
       for theme in appearances {
@@ -625,6 +672,10 @@ final class RouteBarStatusViewRenderingTests: XCTestCase {
   private func render<Content: View>(
     _ content: Content, at size: NSSize, appearance: NSAppearance.Name? = nil
   ) throws -> Data {
+    let fontURL = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+      .appendingPathComponent("Support/Fonts/Manrope-Variable.ttf")
+    CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, nil)
     let hostingView = NSHostingView(
       rootView: content.background(Color(nsColor: .windowBackgroundColor)))
     if let appearance { hostingView.appearance = NSAppearance(named: appearance) }

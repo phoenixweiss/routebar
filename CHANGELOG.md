@@ -8,6 +8,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- The status header background now fills the window width when its compact
+  layout hides the update timestamp, avoiding an unpainted strip on the right.
+
 ## [0.5.0] - 2026-10-15
 
 ### Added
