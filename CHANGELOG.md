@@ -8,6 +8,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-16
+
 ### Fixed
 
 - The status header background now fills the window width when its compact
@@ -255,7 +257,8 @@ These application changes are included in the 0.4.1 public release.
 - Privileged route state is restricted to a fixed root-owned path instead of a
   caller-selected location.
 
-[Unreleased]: https://github.com/phoenixweiss/routebar/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/phoenixweiss/routebar/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/phoenixweiss/routebar/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/phoenixweiss/routebar/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/phoenixweiss/routebar/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/phoenixweiss/routebar/compare/v0.3.1...v0.4.0
